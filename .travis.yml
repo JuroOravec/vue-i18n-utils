@@ -63,7 +63,7 @@ jobs:
         on:
           # Branch selection is managed by semantic-release in .releaserc.yml
           all_branches: true
-          repo: JuroOravec/vue-i18n-utils
+          repo: JuroOravec/i18n-util
       after_deploy:
         - npx snyk monitor
 
