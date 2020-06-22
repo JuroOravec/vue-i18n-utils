@@ -1,0 +1,8 @@
+{
+  "en": {
+    "message": {
+      "hi": "hello",
+      "hello": "Hello i18n in SFC!"
+    }
+  }
+}

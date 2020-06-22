@@ -1,0 +1,93 @@
+// Note: Don't take this file too seriously, just needed some content.
+
+// Lyrics of "Broken Man" by Fox Stevenson
+
+[Verse 1]
+From the tip of my nose my head goes
+Yeah, I feel it start
+I got lights in my soul, shade in my heart
+This ain't me but it's close
+That's my favorite part
+It's all good, grab a cup and get your stupid on
+
+[Pre-Chorus]
+Well the times they change
+And we remain the same we always were
+And if you're tired again
+Ignore the pain and smile through the hurt
+Oh no
+It's all coming back again
+
+[Chorus]
+And I don't wanna waste your time
+Just tryin' to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+No, I don't wanna waste your time
+Just trying to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+
+[Verse 2]
+Yeah hello, I'm still here
+Problems up to my neck
+I've got friends in my phone
+But I never connect
+I'm expecting no less than a bravery check
+Oh, why do I pretend
+
+[Pre-Chorus]
+Well the times they change
+And we remain the same we always were
+And if you're tired again
+Ignore the pain
+It's coming back again
+
+[Chorus]
+And I don't wanna waste your time
+Just tryin' to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+No, I don't wanna waste your time
+Just tryin' to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+
+[Bridge]
+And if life's just a game
+I'd like to learn how to play
+And if it's all the same
+I'd like to do this again
+And if life's just a game
+I'd like to learn how to play
+And if it's all the same
+I'd like to try this again
+
+[Chorus]
+And I don't wanna waste your time
+Just tryin' to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+No, I don't wanna waste your time
+Just tryin' to make you understand
+Yeah, maybe I'm a broken man
+But I still work
+
+[Outro]
+And if life's just a game
+I gotta learn how to play
+And if it's all the same
+I'd like to do this again
+And if life's just a game
+I gotta learn how to play
+Yeah, maybe I'm a broken man
+But I still work
+<i18n>
+{
+  "bz": {
+    "hi": {
+      "there2": "badabom"
+    }
+  }
+}
+</i18n>
