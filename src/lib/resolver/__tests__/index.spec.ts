@@ -29,14 +29,14 @@ describe('PathResolver', () => {
         expect(nonemptyPathResolver.options).toEqual(options);
       });
 
-      test('can pass args at resolve', () => {
+      test('can pass args at resolve', async () => {
         const pathResolver = new klass();
-        pathResolver.resolve([], options);
+        await pathResolver.resolve([], options);
       });
 
-      test('passing empty array returns empty array', () => {
+      test('passing empty array returns empty array', async () => {
         const pathResolver = new klass(options);
-        const paths = pathResolver.resolve([]);
+        const paths = await pathResolver.resolve([]);
         expect(paths).toBeTruthy();
         expect(paths).toHaveLength(0);
       });
@@ -45,11 +45,11 @@ describe('PathResolver', () => {
 
   // Note that although this is tested with the PathResolver, this should be
   // applicable to each subclass
-  test('args passed to resolve method override those from instantiation', () => {
+  test('args passed to resolve method override those from instantiation', async () => {
     const dummyPaths = ['a', 'b', 'c'];
     const dummyCwd = '/this/super/cool/path';
     const pathResolver = new CwdPathResolver({ cwd: 'bonjour' });
-    const paths = pathResolver.resolve(dummyPaths, { cwd: dummyCwd });
+    const paths = await pathResolver.resolve(dummyPaths, { cwd: dummyCwd });
     const expectePaths = dummyPaths.map((p) => path.resolve(dummyCwd, p));
     expect(paths).toBeTruthy();
     expect(paths).toHaveLength(expectePaths.length);
@@ -57,10 +57,10 @@ describe('PathResolver', () => {
   });
 
   describe('NullPathResolver', () => {
-    test('returns given paths', () => {
+    test('returns given paths', async () => {
       const dummyPaths = ['a', 'b', 'c'];
       const pathResolver = new NullPathResolver();
-      const paths = pathResolver.resolve(dummyPaths);
+      const paths = await pathResolver.resolve(dummyPaths);
       expect(paths).toBeTruthy();
       expect(paths).toHaveLength(dummyPaths.length);
       expect(paths).toEqual(dummyPaths);
@@ -70,9 +70,9 @@ describe('PathResolver', () => {
   describe('CwdPathResolver', () => {
     const dummyPaths = ['../some.thing', '/a/n/o/t/h/e/r/thi.ng', './path'];
 
-    test('resolves given paths relative to process.cwd by default', () => {
+    test('resolves given paths relative to process.cwd by default', async () => {
       const pathResolver = new CwdPathResolver();
-      const paths = pathResolver.resolve(dummyPaths);
+      const paths = await pathResolver.resolve(dummyPaths);
       const expectePaths = dummyPaths.map((p) =>
         path.resolve(process.cwd(), p),
       );
@@ -81,10 +81,10 @@ describe('PathResolver', () => {
       expect(paths).toEqual(expectePaths);
     });
 
-    test('resolves given paths relative to a specified cwd if given in option', () => {
+    test('resolves given paths relative to a specified cwd if given in option', async () => {
       const dummyCwd = '/this/super/cool/path';
       const pathResolver = new CwdPathResolver();
-      const paths = pathResolver.resolve(dummyPaths, { cwd: dummyCwd });
+      const paths = await pathResolver.resolve(dummyPaths, { cwd: dummyCwd });
       const expectePaths = dummyPaths.map((p) => path.resolve(dummyCwd, p));
       expect(paths).toBeTruthy();
       expect(paths).toHaveLength(expectePaths.length);

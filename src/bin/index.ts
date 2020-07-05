@@ -27,6 +27,7 @@ export const program = new Command()
   .version(version)
   .name('i18n-util')
   .allowUnknownOption();
+
 commands.forEach(([createCmd, opts = {}]) => createCmd(program, opts));
 
 if (require.main === module) {

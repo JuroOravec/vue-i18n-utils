@@ -10,17 +10,17 @@ export namespace IPathFormatter {
     /**
      * Detect locale from path
      */
-    localeFromPath: (path: string) => string | null;
+    localeFromPath: (path: string) => string | null | Promise<string | null>;
 
     /**
      * Replace path while keeping the locale.
      */
-    changePath: (p: string, newPath: string) => string;
+    changePath: (p: string, newPath: string) => string | Promise<string>;
 
     /**
      * Replace locale while keeping the rest of the path.
      */
-    changeLocale: (p: string, newLocale: string) => string;
+    changeLocale: (p: string, newLocale: string) => string | Promise<string>;
   }
 }
 
@@ -41,26 +41,32 @@ export class PathFormatter implements IPathFormatter.PathFormatter {
       options.localePattern ?? /(?<=-|^|\/|\\)(?<locale>.{2})(?=\.[^.]+$)/iu;
   }
 
-  localeFromPath(path: string) {
+  localeFromPath(path: string): string | null {
     const match = path.match(this.localePattern);
     return match ? (match.groups ? match.groups.locale : match[0]) : match;
   }
 
-  changePath(p: string, newPath: string) {
+  changePath(p: string, newPath: string): string {
     const locale = this.localeFromPath(p);
+
     if (locale === null) throw Error(`No locale detected in '${p}'`);
+
     return this.changeLocale(newPath, locale);
   }
 
-  changeLocale(p: string, newLocale: string) {
+  changeLocale(p: string, newLocale: string): string {
     if (!newLocale) throw Error(`Invalid locale '${newLocale}'`);
+
     const oldLocale = this.localeFromPath(p);
+
     // We can use the regexp to do the replace
     if (oldLocale) {
       return p.replace(this.localePattern, newLocale);
     }
+
     // Else add the new locale as a name suffix
     const parsedPath = path.parse(p);
+
     return path.format({
       ...parsedPath,
       base: parsedPath.name + '-' + newLocale + parsedPath.ext,

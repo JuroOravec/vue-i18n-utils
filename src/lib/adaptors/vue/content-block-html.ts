@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs, { promises as fsp } from 'fs';
 import path from 'path';
 
 import type { AnyObj } from '../../../types';
@@ -122,15 +122,19 @@ export class HTMLContentBlock extends ContentBlock
    *
    * Returns undefined if deserializer cannot be found.
    */
-  getVirtualContent() {
+  async getVirtualContent() {
     if (this.virtualContent !== undefined) return this.virtualContent;
+
     const { lang, src } = this.attributes;
     const serializer = this.serializers?.resolve(lang || 'json');
     const { options = {}, methods = {} } = serializer || {};
+
     if (!methods.deserializer) return;
+
     const content =
-      (src ? fs.readFileSync(this.source, 'utf-8') : this.content) || '{}';
-    const vContent = methods.deserializer(content, options);
+      (src ? await fsp.readFile(this.source, 'utf-8') : this.content) || '{}';
+
+    const vContent = await methods.deserializer(content, options);
     this.virtualContent = vContent;
     return vContent;
   }
@@ -151,17 +155,17 @@ export class HTMLContentBlock extends ContentBlock
    * Removes the associated node from the DOM. Also removes a linked file if
    * there is any.
    */
-  remove(contentGroup: IContentGroup.ContentGroup) {
-    this.removeSource();
-    (this.node as Element).remove();
+  async remove(contentGroup: IContentGroup.ContentGroup) {
+    await this.removeSource();
+    await (this.node as Element).remove();
   }
 
   /**
    * Removes a linked file if there is any.
    */
-  removeSource() {
+  async removeSource() {
     if (this.attributes.src && fs.existsSync(this.source)) {
-      fs.unlinkSync(this.source);
+      await fsp.unlink(this.source);
     }
   }
 

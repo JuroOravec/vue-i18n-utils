@@ -27,7 +27,7 @@ export namespace AI_Item {
      * Path (list of object keys) of the translation key that the value stored
      * by the item relates to.
      */
-    path?: string[];
+    path: string[];
 
     /**
      * Line in the file where the usage has been observed

@@ -1,6 +1,6 @@
 import chunk from 'lodash.chunk';
 import cloneDeep from 'lodash.clonedeep';
-const cliWidth = require('cli-width');
+import cliWidth from 'cli-width';
 
 type Table = string[][] & {
   options: {
@@ -53,6 +53,7 @@ export function borderLen(
       mid: (n) => n - 1,
     },
   };
+
   return Object.entries(relChars[side]).reduce(
     (sum, [charId, cellCountDepLen]) =>
       sum + table.options.chars[charId].length * cellCountDepLen(cellCount),
@@ -69,6 +70,7 @@ export function paddingLen(table: any, cellCount = 0) {
       'padding-right': (n) => n,
     },
   };
+
   return Object.entries(relChars.horizontal).reduce(
     (sum, [paddingId, cellCountDepLen]) =>
       sum + (table.options.style[paddingId] || 0) * cellCountDepLen(cellCount),
@@ -84,25 +86,29 @@ export function calcColWidths(
   } = {},
 ) {
   const { min = [], max = [] } = options;
-  const cli = cliWidth() as number;
+  const cli = cliWidth();
 
   const maxColWidths = [table.options.head || [], ...table].reduce(
     (widths, row) => {
       row.forEach((cell, i) => {
         const strVal = cell === undefined ? '' : cell;
+
         for (const val of strVal.split('\n')) {
           if (widths[i] === undefined || val.toString().length > widths[i]) {
             widths[i] = val.toString().length;
           }
         }
       });
+
       return widths;
     },
     [] as number[],
   );
+
   const normMinWidths = maxColWidths.map((_, i) =>
     typeof min[i] === 'number' ? min[i]! : 1,
   );
+
   const normMaxWidths = maxColWidths.map((maxVal, i) =>
     typeof max[i] === 'number' ? Math.min(max[i]!, maxVal) : maxVal,
   );
@@ -130,8 +136,10 @@ export function calcColWidths(
   })();
 
   let staleCount = 0;
+
   while (lowerBound !== upperBound) {
     const { normalizer, comparator, truthyUpdator, falsyUpdator } = toggle();
+
     const guess = normalizer((upperBound + lowerBound) / 2);
     const res =
       // Sum cols, taking into consideration the max lengths cols can achieve
@@ -148,6 +156,7 @@ export function calcColWidths(
   }
 
   const cellPadding = paddingLen(table, 1);
+
   return normMaxWidths.map(
     (val) => cellPadding + (val < lowerBound ? val : lowerBound),
   );
@@ -155,15 +164,21 @@ export function calcColWidths(
 
 export function breakWords(table: Table) {
   const cellPadding = paddingLen(table, 1);
+
   const formattedTable = table.map((row) =>
     row.map((cell, i) => {
       const cellWidth = table.options.colWidths[i];
+
       if (cellWidth === undefined || cell === undefined) return cell;
+
       const effectiveCellWidth = cellWidth ? cellWidth - cellPadding : 0;
       const words = cell.toString().split(/\s+/gi);
+
       let splitWordsCell = cell;
+
       for (const word of words) {
         if (word.length <= effectiveCellWidth) continue;
+
         splitWordsCell = splitWordsCell.replace(
           word,
           chunk(word, effectiveCellWidth)
@@ -171,9 +186,12 @@ export function breakWords(table: Table) {
             .join('\n'),
         );
       }
+
       return splitWordsCell;
     }),
   ) as Table;
+
   formattedTable.options = cloneDeep(table.options);
+
   return formattedTable;
 }

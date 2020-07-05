@@ -1,7 +1,7 @@
 import flattenDeep from 'lodash.flattendeep';
 import groupBy from 'lodash.groupby';
 import merge from 'lodash.merge';
-import fs from 'fs';
+import { promises as fsp } from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { parseVueFiles } from 'vue-i18n-extract';
@@ -24,6 +24,7 @@ import { safeWrite, ISafeWriteOptions } from '../../util/fs';
 import { ContentFormatter, IContentFormatter } from '../../content-formatter';
 import { PathFormatter, IPathFormatter } from '../../path-formatter';
 import { vueDebug as debug } from '../../util/debug';
+import { pMap } from '../../util/array';
 
 export namespace IAdaptorVue {
   export interface LoadBlockOptions {
@@ -124,14 +125,17 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
   /**
    * Definitions and merges data from i18n tags from Vue files.
    */
-  parser(
+  async parser(
     ...[filepaths, options = {}]: IAdaptorVue.ParserParams
-  ): IAdaptorVue.ParserReturn {
+  ): Promise<IAdaptorVue.ParserReturn> {
     const { missingValue, includeMissing } = options;
-    const nestedFragments = filepaths.map((filepath) =>
-      this.readBlocks(filepath).map(({ block, ...rest }) => {
+    const nestedFragments = await pMap(filepaths, async (filepath) => {
+      const blocks = await this.readBlocks(filepath);
+
+      return pMap(blocks, async ({ block, ...rest }) => {
         debug(`Parsing block from '${filepath}'`);
-        const content = this.loadBlock(block, { ...options, filepath });
+
+        const content = await this.loadBlock(block, { ...options, filepath });
         const { locale, src } = block.attributes;
         const contentByLocales = content
           ? locale
@@ -153,8 +157,9 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
               includeMissing,
             }).items,
         );
-      }),
-    );
+      });
+    });
+
     debug(`Done parsing files`);
     return flattenDeep(nestedFragments);
   }
@@ -162,9 +167,9 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
   /**
    * Writes data from to i18n tags in Vue files.
    */
-  writer(
+  async writer(
     ...[definitions, options]: IAdaptorVue.WriterParams
-  ): IAdaptorVue.WriterReturn {
+  ): Promise<IAdaptorVue.WriterReturn> {
     const {
       abortOnError,
       lang,
@@ -200,21 +205,21 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
     // that harbours the translations specific to the locale from which the
     // definitions were copied.
     if (fileMatchLocale) {
-      (definitions as IVueDefinitionItem[]).forEach((item) => {
+      await pMap(definitions as IVueDefinitionItem[], async (item) => {
         if (
           item.sourceScope === 'locale' &&
           item.locale &&
           item.locale !== localeGeneral &&
           item.link &&
-          pathFormatter.localeFromPath(item.link) !== item.locale
+          (await pathFormatter.localeFromPath(item.link)) !== item.locale
         ) {
-          item.link = pathFormatter.changeLocale(item.link, item.locale);
+          item.link = await pathFormatter.changeLocale(item.link, item.locale);
         }
       });
     }
 
-    safeWrite(options, ({ writeFileSync }) => {
-      for (const [filepath, data] of Object.entries(definitionsByFilepaths)) {
+    return safeWrite(options, async ({ promises: { writeFile } }) =>
+      pMap(Object.entries(definitionsByFilepaths), async ([filepath, data]) => {
         // Since vue-i18n allows to include i18n tags that load data from
         // another file, we want to capture these so we can update those files
         // later
@@ -223,28 +228,28 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
           content?: string;
         }[] = [];
 
-        const domContent = DOMContentGroup.fromFile(filepath, {
+        const domContent = await DOMContentGroup.fromFile(filepath, {
           invalidPathOk: true,
           serializers: this.serializers,
           filepath,
         });
-        const { matched, prepend, append } = domContent.resolveItems(
+        const { matched, prepend, append } = await domContent.resolveItems(
           data,
           options,
         );
 
         // Go over the items that matched against existing blocks, and update
         // their contents, or remove them if no item matched.
-        domContent.blocks.forEach((block) => {
+        await pMap(domContent.blocks, async (block) => {
           const itemsToApply = matched.get(block);
-          const isI18nTag = block.isElement('i18n');
+          const isI18nTag = await block.isElement('i18n');
 
           // Skip if we have no items
           if (!itemsToApply || !itemsToApply.length) {
             // If we came across a i18n tag but there's no data to be written
             // to it, remove the block. This should also remove the file linked
             // to the block via 'src' attribute
-            if (isI18nTag) domContent.remove(block);
+            if (isI18nTag) await domContent.remove(block);
             return;
           }
 
@@ -258,20 +263,23 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
             );
           }
 
-          const serializedContent = block.serializeItems(itemsToApply, options);
-          const formattedContent = contentFormatter.formatContent(
+          const serializedContent = await block.serializeItems(
+            itemsToApply,
+            options,
+          );
+          const formattedContent = await contentFormatter.formatContent(
             serializedContent,
           );
 
-          const link = block.srcFromItems(itemsToApply);
+          const link = await block.srcFromItems(itemsToApply);
           if (link) {
             sourcesToUpdate.push({
               src: block.source!,
               content: formattedContent,
             });
           } else if (block.attributes.src) {
-            block.removeSource();
-            block.removeAttribute('src');
+            await block.removeSource();
+            await block.removeAttribute('src');
           }
           block.content = link
             ? contentFormatter.emptyContent
@@ -285,11 +293,11 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
             // If any of the items specifies the definition as being linked to
             // a file, move all items of the current set to that file.
 
-            domContent.insertText({
+            await domContent.insertText({
               text: contentFormatter.beforeBlock,
               position,
             });
-            const block = domContent.insertElement({
+            const block = await domContent.insertElement({
               position,
               attributes: {
                 ...langAttr,
@@ -298,15 +306,21 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
                 ...(locale !== localeGeneral ? { locale } : {}),
               },
             });
-            const link = block.srcFromItems(items);
-            const serializedContent = block.serializeItems(items, options);
-            const formattedContent = contentFormatter.formatContent(
+            const link = await block.srcFromItems(items);
+
+            const serializedContent = await block.serializeItems(
+              items,
+              options,
+            );
+            const formattedContent = await contentFormatter.formatContent(
               serializedContent,
             );
+
             block.content = link
               ? contentFormatter.emptyContent
               : formattedContent;
-            domContent.insertText({
+
+            await domContent.insertText({
               text: contentFormatter.afterBlock,
               position,
             });
@@ -314,7 +328,7 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
             if (link) {
               sourcesToUpdate.push({
                 src: block.source!,
-                content: formattedContent,
+                content: await contentFormatter.formatGroup(formattedContent),
               });
             }
           }
@@ -323,23 +337,21 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
         // Add the modified dom to the files to be updated
         sourcesToUpdate.push({
           src: filepath,
-          content: domContent.content,
+          content: await contentFormatter.formatGroup(domContent.content),
         });
 
         // Overwrite the files with the updated content
-        for (const { src, content } of sourcesToUpdate) {
+        return pMap(sourcesToUpdate, async ({ src, content }) => {
           try {
             debug(`Updating file '${src}'`);
-            writeFileSync(src, contentFormatter.formatGroup(content || ''), {
-              encoding: 'utf-8',
-            });
+            await writeFile(src, content || '', { encoding: 'utf-8' });
           } catch (e) {
             debug(`Failed to update file '${src}'. Reason: '${e}'`);
             if (abortOnError) throw e;
           }
-        }
-      }
-    });
+        });
+      }),
+    );
   }
 
   /**
@@ -347,47 +359,48 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
    */
   remover(
     ...[filepaths, options]: IAdaptorVue.RemoverParams
-  ): IAdaptorVue.WriterReturn {
+  ): Promise<IAdaptorVue.WriterReturn> {
     const { abortOnError, contentFormatter } = merge(
       {},
       VueAdaptor.defaults,
       options,
     );
 
-    safeWrite(options, ({ writeFileSync, unlinkSync }) => {
-      for (const filepath of filepaths) {
-        const domContent = DOMContentGroup.fromFile(filepath, {
+    return safeWrite(options, async ({ promises: { writeFile, unlink } }) =>
+      pMap(filepaths, async (filepath) => {
+        const domContent = await DOMContentGroup.fromFile(filepath, {
           invalidPathOk: true,
           serializers: this.serializers,
           filepath,
         });
 
         // Go over content existing blocks, and remove i18n tags.
-        domContent.blocks.forEach((block) => {
-          const isI18nTag = block.isElement('i18n');
-          if (isI18nTag) block.remove(domContent);
+        await pMap(domContent.blocks, async (block) => {
+          const isI18nTag = await block.isElement('i18n');
+          if (isI18nTag) await block.remove(domContent);
         });
+
         const content = domContent.content;
 
         const action = content.trim() ? 'update' : 'remove';
+
         try {
           if (action === 'remove') {
             debug(`Removing file '${filepath}'`);
-            unlinkSync(filepath);
+            await unlink(filepath);
           } else {
             debug(`Updating file '${filepath}'`);
-            writeFileSync(
-              filepath,
-              contentFormatter.formatGroup(domContent.content || ''),
-              { encoding: 'utf-8' },
+            const formattedContent = await contentFormatter.formatGroup(
+              domContent.content || '',
             );
+            await writeFile(filepath, formattedContent, { encoding: 'utf-8' });
           }
         } catch (e) {
           debug(`Failed to ${action} file '${filepath}'. Reason: '${e}'`);
           if (abortOnError) throw e;
         }
-      }
-    });
+      }),
+    );
   }
 
   /**
@@ -398,21 +411,25 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
    * Fetches block content if the block has `src` attribute and filepath is
    * given
    */
-  readBlocks(filepath: string, options: IAdaptorVue.ReadBlocksOptions = {}) {
-    const domContent = DOMContentGroup.fromFile(filepath, {
+  async readBlocks(
+    filepath: string,
+    options: IAdaptorVue.ReadBlocksOptions = {},
+  ) {
+    const domContent = await DOMContentGroup.fromFile(filepath, {
       ...options,
       filepath,
     });
     const i18n: { block: IHTMLContentBlock; blockIndex: number }[] = [];
-    domContent.blocks.forEach((block, index) => {
+    await pMap(domContent.blocks, async (block, index) => {
       // Filter for the i18n tags and preserve info on the element's position
-      if (!block.isElement('i18n')) return;
-      i18n.push({ block, blockIndex: index });
+      const isI18nTag = await block.isElement('i18n');
+      if (!isI18nTag) return;
+      i18n.push({ block, blockIndex: index! });
     });
     return i18n;
   }
 
-  loadBlock(
+  async loadBlock(
     block: IContentBlock.ContentBlock,
     opts: IAdaptorVue.LoadBlockOptions,
   ) {
@@ -421,7 +438,7 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
     // Fetch data from another file if `src` attribute is provided
     const text: string =
       src && filepath
-        ? fs.readFileSync(path.resolve(filepath, '..', src), 'utf-8')
+        ? await fsp.readFile(path.resolve(filepath, '..', src), 'utf-8')
         : block.content;
 
     // Parse contents based on lang and whether content is scope to
@@ -440,8 +457,8 @@ export class VueAdaptor implements IAdaptorCollection.ItemMethods {
       abortOnError: true,
       explicitLang: false,
       fileMatchLocale: true,
-      contentFormatter: new ContentFormatter(),
-      pathFormatter: new PathFormatter(),
+      contentFormatter: new ContentFormatter() as IContentFormatter.ContentFormatter,
+      pathFormatter: new PathFormatter() as IPathFormatter.PathFormatter,
       serializers: new SerializerCollection({
         collection: {
           json: {

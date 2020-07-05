@@ -19,9 +19,13 @@ export namespace AIValidator {
 
   export abstract class Validator {
     options = {} as AnyObj;
+
     logger = {} as (msg: string) => void;
-    validate(schema: any, data: any, options?: ValidateOptions) {
-      return {} as any;
-    }
+
+    validate = {} as (
+      schema: any,
+      data: any,
+      options?: ValidateOptions,
+    ) => any | Promise<any>;
   }
 }

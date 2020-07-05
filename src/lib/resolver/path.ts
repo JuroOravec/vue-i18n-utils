@@ -1,4 +1,3 @@
-import glob from 'glob';
 import merge from 'lodash.merge';
 import path from 'path';
 
@@ -10,6 +9,7 @@ import {
   cwdPathResolverDebug,
 } from '../util/debug';
 import { Resolver } from './resolver';
+import pGlob from '../util/p-glob';
 
 export abstract class AbstractPathResolver extends Resolver
   implements IResolver.Resolver {
@@ -30,10 +30,10 @@ export class NullPathResolver extends AbstractPathResolver
     super(options);
   }
 
-  resolve<T extends string>(paths: T[], options = {}) {
+  resolve<T extends string>(paths: T[], options = {}): T[] {
     this.logger('Resolving paths.');
     this.logger('Done resolving paths.');
-    return paths as T[];
+    return paths;
   }
 
   static get defaults() {
@@ -56,12 +56,18 @@ export class CwdPathResolver extends AbstractPathResolver
     super(options);
   }
 
-  resolve(paths: string[], options: IResolver.Path.Cwd.ResolveOptions = {}) {
+  resolve(
+    paths: string[],
+    options: IResolver.Path.Cwd.ResolveOptions = {},
+  ): string[] {
     const { cwd } = merge({}, CwdPathResolver.defaults, this.options, options);
 
     this.logger('Resolving paths.');
+
     const filepaths = paths.map((p) => path.resolve(cwd, p));
+
     this.logger('Done resolving paths.');
+
     return filepaths;
   }
 
@@ -86,26 +92,32 @@ export class GlobPathResolver extends AbstractPathResolver
     super(options);
   }
 
-  resolve(globs: string[], options: IResolver.Path.Glob.ResolveOptions = {}) {
+  async resolve(
+    globs: string[],
+    options: IResolver.Path.Glob.ResolveOptions = {},
+  ): Promise<string[]> {
     const opts = merge({}, GlobPathResolver.defaults, this.options, options);
     const { cwd } = opts;
 
     const globPattern = GlobPathResolver.join(globs);
     this.logger(`Resolving paths for pattern ${globPattern}.`);
-    const filepaths = glob
-      .sync(globPattern, { nodir: true, ...opts })
-      .map((p) => path.resolve(cwd, p));
+
+    const filepaths = (
+      await pGlob(globPattern, { nodir: true, ...opts })
+    ).map((p) => path.resolve(cwd, p));
+
     this.logger(
       'Done resolving paths. Found ' +
         `${filepaths.length} files for glob '${globPattern}'.`,
     );
+
     return filepaths;
   }
 
   /**
    * Join globs into a single pattern
    */
-  static join(globs: string[]) {
+  static join(globs: string[]): string {
     return `{${globs.join(',')},}`;
   }
 

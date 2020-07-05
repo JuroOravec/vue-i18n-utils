@@ -9,86 +9,104 @@
  */
 
 import { applyMixins } from '../util/apply-mixins';
+import { UnwrapPromise } from '../../types';
 
 export namespace AI_I18nUtil {
-  /**
-   * Base class with base functionalities shared among the I18nUtil classes
-   */
-  export abstract class Base {
+  abstract class BaseCommon {
     adaptors = {} as {
       add: (...args: any[]) => any | void;
       delete: (name: string) => any | void;
     };
-    pathResolver = {} as { resolve: (paths: any[], ...args: any[]) => any[] };
+
+    pathResolver = {} as {
+      resolve: (paths: any[], ...args: any[]) => any[] | Promise<any[]>;
+    };
+
     localeResolver = {} as {
       resolve: (
         locales: any[],
         items: { locale: any }[],
         ...args: any[]
-      ) => any[];
+      ) => any[] | Promise<any[]>;
     };
+
     keyResolver = {} as {
-      resolve: (keys: any[], items: { path: any }[], ...args: any[]) => any[];
+      resolve: (
+        keys: any[],
+        items: { path: any }[],
+        ...args: any[]
+      ) => any[] | Promise<any[]>;
     };
+
     valueResolver = {} as {
       resolve: (
         values: any[],
         items: { value: any }[],
         ...args: any[]
-      ) => any[];
+      ) => any[] | Promise<any[]>;
     };
-    schemator = {} as { generate: (...args: any[]) => any };
-    validator = {} as { validate: (...args: any[]) => any };
+
+    schemator = {} as { generate: (...args: any[]) => any | Promise<any> };
+
+    validator = {} as { validate: (...args: any[]) => any | Promise<any> };
+
     options: any;
 
-    addAdaptor(params: any) {
-      return undefined as any | void;
-    }
+    addAdaptor = {} as (params: any) => any | void;
 
-    addAdaptors(paramsList: any[]) {
-      return undefined as any | void;
-    }
+    addAdaptors = {} as (paramsList: any[]) => any | void;
 
-    removeAdaptor(name: any) {
-      return undefined as any | void;
-    }
+    removeAdaptor = {} as (name: any) => any | void;
 
-    removeAdaptors(names: any[]) {
-      return undefined as any | void;
-    }
+    removeAdaptors = {} as (names: any[]) => any | void;
 
-    resolvePaths(paths: any[], options?: any) {
-      return [] as any[];
-    }
-
-    resolveLocales(items: { locale: any }[], locales: any[], options?: any) {
-      return [] as any[];
-    }
-
-    resolveKeys(items: { path: any }[], keys: any[], options?: any) {
-      return [] as any[];
-    }
-
-    resolveValues(items: { value: any }[], keys: any[], options?: any) {
-      return [] as any[];
-    }
+    resolvePaths = {} as (
+      paths: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
   }
 
-  export abstract class LoadedBase<T extends Base = Base> extends Base {
+  /**
+   * Base class with base functionalities shared among the I18nUtil classes
+   */
+  export abstract class Base extends BaseCommon {
+    resolveLocales = {} as (
+      items: any[],
+      locales: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
+
+    resolveKeys = {} as (
+      items: any[],
+      keys: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
+
+    resolveValues = {} as (
+      items: any[],
+      keys: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
+  }
+
+  export abstract class LoadedBase<T extends Base = Base> extends BaseCommon {
     i18nUtil = {} as T;
     loaded: any;
 
-    resolveLocales(locales: any[], options?: any) {
-      return [] as ReturnType<Base['resolveLocales']>;
-    }
+    resolveLocales = {} as (
+      locales: any[],
+      options?: any,
+    ) => ReturnType<Base['resolveLocales']>;
 
-    resolveKeys(keys: any[], options?: any) {
-      return [] as ReturnType<Base['resolveKeys']>;
-    }
+    resolveKeys = {} as (
+      keys: any[],
+      options?: any,
+    ) => ReturnType<Base['resolveKeys']>;
 
-    resolveValues(keys: any[], options?: any) {
-      return [] as ReturnType<Base['resolveValues']>;
-    }
+    resolveValues = {} as (
+      keys: any[],
+      options?: any,
+    ) => ReturnType<Base['resolveValues']>;
   }
 
   /**
@@ -103,15 +121,25 @@ export namespace AI_I18nUtil {
     missingLocales: (...args: any[]) => string[];
     usageAnalyze: (
       ...args: any[]
-    ) => {
-      usage: { defined: any[]; undefined: any[]; missing: any[] };
-      definitions: {
-        used: any[];
-        unused: any[];
-        missing: any[];
-        duplicates: Map<string, Map<string, any[]>>;
-      };
-    };
+    ) =>
+      | {
+          usage: { defined: any[]; undefined: any[]; missing: any[] };
+          definitions: {
+            used: any[];
+            unused: any[];
+            missing: any[];
+            duplicates: Map<string, Map<string, any[]>>;
+          };
+        }
+      | Promise<{
+          usage: { defined: any[]; undefined: any[]; missing: any[] };
+          definitions: {
+            used: any[];
+            unused: any[];
+            missing: any[];
+            duplicates: Map<string, Map<string, any[]>>;
+          };
+        }>;
     usageValidate: (...args: any[]) => void;
   }
 
@@ -121,49 +149,39 @@ export namespace AI_I18nUtil {
    */
   export abstract class ItemProcessor extends Base
     implements ItemProcessorBase {
-    master(definitions: any[], options?: any) {
-      return undefined as any;
-    }
+    master = {} as (definitions: any[], options?: any) => any;
 
-    locale(definitions: any[], locale: any, options?: any) {
-      return undefined as any;
-    }
+    locale = {} as (
+      definitions: any[],
+      locale: any,
+      options?: any,
+    ) => any | Promise<any>;
 
-    locales(definitions: any[], locales: any[], options?: any) {
-      return undefined as any;
-    }
+    locales = {} as (
+      definitions: any[],
+      locales: any[],
+      options?: any,
+    ) => any | Promise<any>;
 
-    toObject(definitions: any[], options?: any) {
-      return undefined as any;
-    }
+    toObject = {} as (definitions: any[], options?: any) => any;
 
-    missingItems(definitions: any[], options?: any) {
-      return [] as any[];
-    }
+    missingItems = {} as (definitions: any[], options?: any) => any[];
 
-    missingLocales(definitions: any[], options?: any) {
-      return [] as string[];
-    }
+    missingLocales = {} as (definitions: any[], options?: any) => string[];
 
-    stats(definitions: any[], usage: any[], options?: any) {
-      return {} as KeyStats;
-    }
+    stats = {} as (definitions: any[], usage: any[], options?: any) => KeyStats;
 
-    usageAnalyze(definitions: any[], usage: any[], options?: any) {
-      return {} as {
-        usage: { defined: any[]; undefined: any[]; missing: any[] };
-        definitions: {
-          used: any[];
-          unused: any[];
-          missing: any[];
-          duplicates: Map<string, Map<string, any[]>>;
-        };
-      };
-    }
+    usageAnalyze = {} as (
+      definitions: any[],
+      usage: any[],
+      options?: any,
+    ) => ReturnType<ItemProcessorBase['usageAnalyze']>;
 
-    usageValidate(definitions: any[], usage: any[], options?: any) {
-      return undefined as void;
-    }
+    usageValidate = {} as (
+      definitions: any[],
+      usage: any[],
+      options?: any,
+    ) => void;
   }
 
   /**
@@ -175,132 +193,153 @@ export namespace AI_I18nUtil {
   > extends LoadedBase<T> implements ItemProcessorBase {
     i18nUtil = {} as T;
 
-    master(options?: any) {
-      return undefined as ReturnType<ItemProcessor['master']>;
-    }
+    master = {} as (options?: any) => ReturnType<ItemProcessor['master']>;
 
-    locale(locale: any, options?: any) {
-      return undefined as ReturnType<ItemProcessor['locale']>;
-    }
+    locale = {} as (
+      locale: any,
+      options?: any,
+    ) => ReturnType<ItemProcessor['locale']>;
 
-    locales(locales: any[], options?: any) {
-      return undefined as ReturnType<ItemProcessor['locales']>;
-    }
+    locales = {} as (
+      locales: any[],
+      options?: any,
+    ) => ReturnType<ItemProcessor['locales']>;
 
-    toObject(options?: any) {
-      return undefined as ReturnType<ItemProcessor['toObject']>;
-    }
+    toObject = {} as (options?: any) => ReturnType<ItemProcessor['toObject']>;
 
-    missingItems(options?: any) {
-      return [] as ReturnType<ItemProcessor['missingItems']>;
-    }
+    missingItems = {} as (
+      options?: any,
+    ) => ReturnType<ItemProcessor['missingItems']>;
 
-    missingLocales(options?: any) {
-      return [] as ReturnType<ItemProcessor['missingLocales']>;
-    }
+    missingLocales = {} as (
+      options?: any,
+    ) => ReturnType<ItemProcessor['missingLocales']>;
 
-    stats(usage: any[], options?: any) {
-      return {} as ReturnType<ItemProcessor['stats']>;
-    }
+    stats = {} as (
+      usage: any[],
+      options?: any,
+    ) => ReturnType<ItemProcessor['stats']>;
 
-    usageAnalyze(usage: any[], options?: any) {
-      return {} as ReturnType<ItemProcessor['usageAnalyze']>;
-    }
+    usageAnalyze = {} as (
+      usage: any[],
+      options?: any,
+    ) => ReturnType<ItemProcessor['usageAnalyze']>;
 
-    usageValidate(usage: any[], options?: any) {
-      return undefined as ReturnType<ItemProcessor['usageValidate']>;
-    }
+    usageValidate = {} as (
+      usage: any[],
+      options?: any,
+    ) => ReturnType<ItemProcessor['usageValidate']>;
   }
 
   // Interface is used for merging mixin types
   export interface I18nUtil extends Base, ItemProcessor {}
+
   /**
    * Main class for working with definitions and the files where these items
    * are defined.
    */
   export abstract class I18nUtil {
-    definitions(paths: any[], options?: any) {
-      return [] as any[];
-    }
+    definitions = {} as (paths: any[], options?: any) => any[] | Promise<any[]>;
 
-    write(definitions: any[], options?: any) {
-      return undefined as any | void;
-    }
+    write = {} as (
+      definitions: any[],
+      options?: any,
+    ) => any | void | Promise<any | void>;
 
-    patch(definitions: any[], options?: any) {
-      return undefined as any | void;
-    }
+    patch = {} as (
+      definitions: any[],
+      options?: any,
+    ) => any | void | Promise<any | void>;
 
-    patchTo(definitions: any[], options?: any) {
-      return {} as DefinitionLoader<I18nUtil, ReturnType<I18nUtil['patch']>>;
-    }
+    patchTo = {} as (
+      definitions: any[],
+      options?: any,
+    ) => DefinitionLoader<I18nUtil, ReturnType<I18nUtil['patch']>>;
 
-    drop(definitions: any[], options?: any) {
-      return undefined as any | void;
-    }
+    drop = {} as (
+      definitions: any[],
+      options?: any,
+    ) => any | void | Promise<any | void>;
 
-    dropFrom(definitions: any[], options?: any) {
-      return {} as DefinitionLoader<I18nUtil, ReturnType<I18nUtil['drop']>>;
-    }
+    dropFrom = {} as (
+      definitions: any[],
+      options?: any,
+    ) => DefinitionLoader<I18nUtil, ReturnType<I18nUtil['drop']>>;
 
-    addLocale(definitions: any[], locale: any, options?: any) {
-      return [] as any[];
-    }
+    addLocale = {} as (
+      definitions: any[],
+      locale: any,
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    addLocales(definitions: any[], locale: any[], options?: any) {
-      return [] as any[];
-    }
+    addLocales = {} as (
+      definitions: any[],
+      locale: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    removeLocale(definitions: any[], locale: any, options?: any) {
-      return [] as any[];
-    }
+    removeLocale = {} as (
+      definitions: any[],
+      locale: any,
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    removeLocales(definitions: any[], locale: any[], options?: any) {
-      return [] as any[];
-    }
+    removeLocales = {} as (
+      definitions: any[],
+      locale: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    clearLocale(definitions: any[], locale: any, options?: any) {
-      return [] as any[];
-    }
+    clearLocale = {} as (
+      definitions: any[],
+      locale: any,
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    clearLocales(definitions: any[], locale: any[], options?: any) {
-      return [] as any[];
-    }
+    clearLocales = {} as (
+      definitions: any[],
+      locale: any[],
+      options?: any,
+    ) => any[] | Promise<any[]>;
 
-    usage(paths: string[], options?: any) {
-      return [] as any[];
-    }
+    usage = {} as (paths: string[], options?: any) => any[] | Promise<any[]>;
 
-    schema(items: any[], options?: any) {
-      return undefined as any;
-    }
+    schema = {} as (items: any[], options?: any) => any | Promise<any>;
 
-    statsAgainst(definitions: any[], options?: any) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['stats']>>;
-    }
+    statsAgainst = {} as (
+      definitions: any[],
+      options?: any,
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['stats']>>;
 
-    validate(definitions: any[], schema: any, options?: any) {
-      return undefined as any | void;
-    }
+    validate = {} as (
+      definitions: any[],
+      schema: any,
+      options?: any,
+    ) => any | void | Promise<any | void>;
 
-    validateAgainst(definitions: any[], options?: any) {
-      return {} as DefinitionLoader<I18nUtil, ReturnType<I18nUtil['validate']>>;
-    }
+    validateAgainst = {} as (
+      definitions: any[],
+      options?: any,
+    ) => DefinitionLoader<I18nUtil, ReturnType<I18nUtil['validate']>>;
 
-    usageAnalyzeAgainst(definitions: any[], options?: any) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['usageAnalyze']>>;
-    }
+    usageAnalyzeAgainst = {} as (
+      definitions: any[],
+      options?: any,
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['usageAnalyze']>>;
 
-    usageValidateAgainst(definitions: any[], options?: any) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['usageValidate']>>;
-    }
+    usageValidateAgainst = {} as (
+      definitions: any[],
+      options?: any,
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['usageValidate']>>;
   }
+
   applyMixins(I18nUtil, [Base, ItemProcessor]);
 
   // Interface is used for merging mixin types
   export interface LoadedI18nUtil<T extends I18nUtil = I18nUtil>
     extends LoadedBase<T>,
       LoadedItemProcessor<T> {}
+
   /**
    * Variant of I18nUtil that stores the definitions it works with.
    */
@@ -309,99 +348,95 @@ export namespace AI_I18nUtil {
   > extends LoadedBase<T> {
     i18nUtil = {} as T;
 
-    definitions(options?: any) {
-      return [] as ReturnType<I18nUtil['definitions']>;
-    }
+    definitions = {} as (options?: any) => ReturnType<I18nUtil['definitions']>;
 
-    usage(paths: string[], options?: any) {
-      return [] as ReturnType<I18nUtil['usage']>;
-    }
+    usage = {} as (
+      paths: string[],
+      options?: any,
+    ) => ReturnType<I18nUtil['usage']>;
 
-    write(options?: any) {
-      return undefined as ReturnType<I18nUtil['write']>;
-    }
+    write = {} as (options?: any) => ReturnType<I18nUtil['write']>;
 
-    patch(options?: any) {
-      return undefined as ReturnType<I18nUtil['patch']>;
-    }
+    patch = {} as (options?: any) => ReturnType<I18nUtil['patch']>;
 
-    patchTo(options?: any) {
-      return {} as ReturnType<I18nUtil['patchTo']>;
-    }
+    patchTo = {} as (options?: any) => ReturnType<I18nUtil['patchTo']>;
 
-    drop(options?: any) {
-      return undefined as ReturnType<I18nUtil['drop']>;
-    }
+    drop = {} as (options?: any) => ReturnType<I18nUtil['drop']>;
 
-    dropFrom(options?: any) {
-      return {} as ReturnType<I18nUtil['dropFrom']>;
-    }
+    dropFrom = {} as (options?: any) => ReturnType<I18nUtil['dropFrom']>;
 
-    addLocale(locale: any, options?: any) {
-      return [] as ReturnType<I18nUtil['addLocale']>;
-    }
+    addLocale = {} as (
+      locale: any,
+      options?: any,
+    ) => ReturnType<I18nUtil['addLocale']>;
 
-    addLocales(locale: any[], options?: any) {
-      return [] as ReturnType<I18nUtil['addLocale']>;
-    }
+    addLocales = {} as (
+      locale: any[],
+      options?: any,
+    ) => ReturnType<I18nUtil['addLocale']>;
 
-    removeLocale(locale: any, options?: any) {
-      return [] as ReturnType<I18nUtil['removeLocale']>;
-    }
+    removeLocale = {} as (
+      locale: any,
+      options?: any,
+    ) => ReturnType<I18nUtil['removeLocale']>;
 
-    removeLocales(locale: any[], options?: any) {
-      return [] as ReturnType<I18nUtil['removeLocales']>;
-    }
+    removeLocales = {} as (
+      locale: any[],
+      options?: any,
+    ) => ReturnType<I18nUtil['removeLocales']>;
 
-    clearLocale(locale: any, options?: any) {
-      return [] as ReturnType<I18nUtil['clearLocale']>;
-    }
+    clearLocale = {} as (
+      locale: any,
+      options?: any,
+    ) => ReturnType<I18nUtil['clearLocale']>;
 
-    clearLocales(locale: any[], options?: any) {
-      return [] as ReturnType<I18nUtil['clearLocales']>;
-    }
+    clearLocales = {} as (
+      locale: any[],
+      options?: any,
+    ) => ReturnType<I18nUtil['clearLocales']>;
 
-    statsAgainst(options?: any) {
-      return {} as ReturnType<I18nUtil['statsAgainst']>;
-    }
+    statsAgainst = {} as (
+      options?: any,
+    ) => ReturnType<I18nUtil['statsAgainst']>;
 
-    schema(options?: any) {
-      return undefined as ReturnType<I18nUtil['schema']>;
-    }
+    schema = {} as (options?: any) => ReturnType<I18nUtil['schema']>;
 
-    validate(schema: any, options?: any) {
-      return undefined as ReturnType<I18nUtil['validate']>;
-    }
+    validate = {} as (
+      schema: any,
+      options?: any,
+    ) => ReturnType<I18nUtil['validate']>;
 
-    validateAgainst(options?: any) {
-      return {} as ReturnType<I18nUtil['validateAgainst']>;
-    }
+    validateAgainst = {} as (
+      options?: any,
+    ) => ReturnType<I18nUtil['validateAgainst']>;
 
-    usageAnalyzeAgainst(options?: any) {
-      return {} as ReturnType<I18nUtil['usageAnalyzeAgainst']>;
-    }
+    usageAnalyzeAgainst = {} as (
+      options?: any,
+    ) => ReturnType<I18nUtil['usageAnalyzeAgainst']>;
 
-    usageValidateAgainst(options?: any) {
-      return {} as ReturnType<I18nUtil['usageValidateAgainst']>;
-    }
+    usageValidateAgainst = {} as (
+      options?: any,
+    ) => ReturnType<I18nUtil['usageValidateAgainst']>;
   }
+
   applyMixins(LoadedI18nUtil, [LoadedBase, LoadedItemProcessor]);
 
   export abstract class Loader<T extends Base = Base, R extends any = any> {
     i18nUtil = {} as T;
-    callback = {} as (...args: any[]) => R;
 
-    loadFromFiles(paths: any[], options?: any) {
-      return {} as R;
-    }
+    callback = {} as (...args: any[]) => R | Promise<UnwrapPromise<R>>;
 
-    loadFromItems(definitions: any[]) {
-      return {} as R;
-    }
+    loadFromFiles = {} as (
+      paths: any[],
+      options?: any,
+    ) => R | Promise<UnwrapPromise<R>>;
 
-    loadFromObjects(objects: any[], options?: any) {
-      return {} as R;
-    }
+    loadFromItems = {} as (definitions: any[]) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromObjects = {} as (
+      objects: any[],
+      options?: any,
+    ) => R | Promise<UnwrapPromise<R>>;
   }
 
   export abstract class DefinitionLoader<

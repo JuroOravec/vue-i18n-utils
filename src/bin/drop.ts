@@ -39,7 +39,7 @@ export function createDropCmd(program?: Cmd, options: CommandOptions = {}) {
             optionalArgCount: 1,
           },
         },
-        ({
+        async ({
           i18nUtil,
           defItems,
           unknownOpts,
@@ -75,7 +75,7 @@ export function createDropCmd(program?: Cmd, options: CommandOptions = {}) {
           );
 
           // Resolve string values from cli and process these args into definitions
-          const resolvedArgResults = processVariadicArgs(
+          const resolvedArgResults = (await processVariadicArgs(
             subtractDefs.items,
             removeArgs,
             {
@@ -85,7 +85,7 @@ export function createDropCmd(program?: Cmd, options: CommandOptions = {}) {
                   i18nUtil.resolveLocales(items, lcls, unknownOpts),
               ],
             },
-          ) as [string[][], string[]][];
+          )) as [string[][], string[]][];
           const dropDefsFromCli = [] as IDefinition.Item[];
           for (const [
             removePaths = [],
@@ -98,7 +98,7 @@ export function createDropCmd(program?: Cmd, options: CommandOptions = {}) {
             }
           }
 
-          i18nUtil
+          await i18nUtil
             .dropFrom(defItems, { hashType: 'localeToken' })
             .loadFromItems([...dropDefsFromFiles, ...dropDefsFromCli]);
         },

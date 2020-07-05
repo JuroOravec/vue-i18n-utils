@@ -3,6 +3,7 @@ import zip from 'lodash.zip';
 
 import type { I_Item } from '../../lib/item/types';
 import type { Cmd } from './types';
+import { pMap } from '../../lib/util/array';
 
 export function parseVariadicArg(
   program: Cmd,
@@ -93,30 +94,33 @@ export function parseVariadicArg(
   return { remainArgs: newArgs, parsedArgs };
 }
 
-export function processVariadicArgs<T extends I_Item.Item>(
+export async function processVariadicArgs<T extends I_Item.Item>(
   items: I_Item.ItemArrayLike<T>,
   argGroups: string[][],
   options: {
-    resolvers?: ((items: T[], values: string[]) => any[])[];
+    resolvers?: ((items: T[], values: string[]) => any[] | Promise<any[]>)[];
   },
 ) {
   const itemsCopy = [...items];
   const { resolvers = [] } = options;
 
-  return argGroups.map((argGroup) => {
+  return pMap(argGroups, async (argGroup) => {
     const args = zip(
       argGroup,
       resolvers,
       argGroup.map((_) => new Map()),
     ) as [string, typeof resolvers[0], Map<string, any>][];
 
-    const resolvedArgs = args.map(([rawVal, resolver, cache]) => {
-      if (rawVal === undefined) return [];
-      if (cache.has(rawVal)) return cache.get(rawVal);
-      const vals = resolver(itemsCopy, [rawVal]);
-      cache.set(rawVal, vals);
-      return vals;
-    }) as any[][];
+    const resolvedArgs = (await pMap(
+      args,
+      async ([rawVal, resolver, cache]) => {
+        if (rawVal === undefined) return [];
+        if (cache.has(rawVal)) return cache.get(rawVal);
+        const vals = await resolver(itemsCopy, [rawVal]);
+        cache.set(rawVal, vals);
+        return vals;
+      },
+    )) as any[][];
 
     return resolvedArgs;
   });

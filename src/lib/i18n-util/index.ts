@@ -7,7 +7,7 @@ import type { I_I18nUtil } from './types';
 import type { IDefinition } from '../definition/types';
 import type { I_Item } from '../item/types';
 import { debug } from '../util/debug';
-import { mapUniq } from '../util/array';
+import { mapUniq, pMap } from '../util/array';
 import { DefinitionArray } from '../definition';
 import { ItemProcessor, LoadedItemProcessor } from './item-processor';
 import { DefinitionLoader, UsageLoader } from './loader';
@@ -23,7 +23,10 @@ type Remover = I_I18nUtil.Remover;
 type UsageAnalyzer = I_I18nUtil.UsageAnalyzer;
 
 export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
-  definitions(paths: string[], options: I_I18nUtil.DefinitionOptions = {}) {
+  async definitions(
+    paths: string[],
+    options: I_I18nUtil.DefinitionOptions = {},
+  ) {
     const pathsByAdaptor = this.adaptors.groupByResolve(paths);
 
     // Prepare parsers
@@ -41,15 +44,18 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     });
 
     // Parse data
-    const i18ns = dataToParse.map(({ adaptor, data, options: opts }) => {
-      debug(`Parsing ${data.length} files with adaptor '${adaptor.name}'`);
-      return (adaptor.methods.parser as Parser)(data, opts);
-    });
+    const i18ns = await pMap(
+      dataToParse,
+      ({ adaptor, data, options: opts }) => {
+        debug(`Parsing ${data.length} files with adaptor '${adaptor.name}'`);
+        return (adaptor.methods.parser as Parser)(data, opts);
+      },
+    );
 
     return flatten(i18ns);
   }
 
-  usage(paths: string[], options: I_I18nUtil.UsageOptions = {}) {
+  async usage(paths: string[], options: I_I18nUtil.UsageOptions = {}) {
     const dataByAdaptor = this.adaptors.groupByResolve(paths);
 
     // Prepare analyzers
@@ -68,7 +74,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
 
     // Analyze data
     return flatten(
-      dataToAnalyze.map(({ adaptor, data, options: opts }) => {
+      await pMap(dataToAnalyze, ({ adaptor, data, options: opts }) => {
         debug(
           `Parsing usage in ${data.length} files with adaptor ` +
             `'${adaptor.name}'`,
@@ -89,10 +95,12 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       [...definitions],
       ({ source }) => source,
     );
-    const dataToWrite = [...dataByAdaptor].map(([adaptor, data]) => {
-      return { adaptor: adaptor!, data };
-    });
-    this._write(dataToWrite, options);
+
+    const dataToWrite = [...dataByAdaptor].map(([adaptor, data]) => ({
+      adaptor: adaptor!,
+      data,
+    }));
+    return this._write(dataToWrite, options);
   }
 
   /**
@@ -107,6 +115,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       const { methods = {}, options: adaptorOpts } = adaptor || {};
       const writerOpts = merge({}, adaptorOpts, this.options, options);
       const dataArr = [...data];
+
       if (!methods.writer) {
         const filesStr = dataArr.map((e) => e.path).join('\n');
         throw Error(
@@ -114,20 +123,21 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
             `following files:\n${filesStr}`,
         );
       }
+
       return { adaptor, data: dataArr, options: writerOpts };
     });
 
     // Write data
-    for (const { adaptor, data, options: opts } of dataToWrite) {
+    return pMap(dataToWrite, ({ adaptor, data, options: opts }) => {
       debug(`Writing ${data.length} entries with adaptor '${adaptor.name}'`);
-      (adaptor.methods.writer as Writer)(data, opts);
-    }
+      return (adaptor.methods.writer as Writer)(data, opts);
+    });
   }
 
   /**
    * Common pathway for removing files using a particular adaptor
    */
-  private _remove(
+  private async _remove(
     removeEntries: { adaptor: Adaptor; data: string[] }[],
     options: I_I18nUtil.DropOptions,
   ) {
@@ -135,6 +145,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     const dataToRemove = removeEntries.map(({ adaptor, data }) => {
       const { methods = {}, options: adaptorOpts } = adaptor || {};
       const removerOpts = merge({}, adaptorOpts, this.options, options);
+
       if (!methods.remover) {
         const filesStr = data.join('\n');
         throw Error(
@@ -142,17 +153,18 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
             `following files:\n${filesStr}`,
         );
       }
+
       return { adaptor, data, options: removerOpts };
     });
 
     // Remove data
-    for (const { adaptor, data, options: opts } of dataToRemove) {
+    return pMap(dataToRemove, ({ adaptor, data, options: opts }) => {
       debug(`Removing ${data.length} files with adaptor '${adaptor.name}'`);
-      (adaptor.methods.remover as Remover)(data, opts);
-    }
+      return (adaptor.methods.remover as Remover)(data, opts);
+    });
   }
 
-  patch(
+  async patch(
     definitions: DefItemArrayLike,
     options: I_I18nUtil.PatchOptions<DefItem> = {},
   ) {
@@ -163,23 +175,26 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     );
 
     // Prepare data
-    const dataToPatch = [...dataByAdaptor].map(([adaptor, defsSubset]) => {
-      const filepaths = mapUniq(defsSubset, (e) => e.source);
-      const staleDefs = this.definitions(filepaths, options);
+    const dataToPatch = await pMap(
+      [...dataByAdaptor],
+      async ([adaptor, defsSubset]) => {
+        const filepaths = mapUniq(defsSubset, (e) => e.source);
+        const staleDefs = await this.definitions(filepaths, options);
 
-      const { items: updatedDefs } = DefinitionArray.update(
-        staleDefs,
-        defsSubset,
-        { ...options, hashType },
-      );
+        const { items: updatedDefs } = DefinitionArray.update(
+          staleDefs,
+          defsSubset,
+          { ...options, hashType },
+        );
 
-      debug(
-        `Will patch ${defsSubset.length} items (of total ` +
-          `${updatedDefs.length} items) with adaptor '${adaptor!.name}'`,
-      );
+        debug(
+          `Will patch ${defsSubset.length} items (of total ` +
+            `${updatedDefs.length} items) with adaptor '${adaptor!.name}'`,
+        );
 
-      return { adaptor: adaptor!, data: updatedDefs };
-    });
+        return { adaptor: adaptor!, data: updatedDefs };
+      },
+    );
 
     return this._write(dataToPatch, options);
   }
@@ -216,7 +231,10 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     });
   }
 
-  drop(definitions: DefItemArrayLike, options: I_I18nUtil.DropOptions = {}) {
+  async drop(
+    definitions: DefItemArrayLike,
+    options: I_I18nUtil.DropOptions = {},
+  ) {
     const { hashType = 'localeToken' } = options;
     const dataByAdaptor = this.adaptors.groupByResolve(
       [...definitions],
@@ -227,11 +245,11 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     const dataToWrite = [] as { adaptor: Adaptor; data: DefItem[] }[];
 
     // Prepare data
-    for (const [adaptor, defsSubset] of dataByAdaptor) {
+    await pMap([...dataByAdaptor], async ([adaptor, defsSubset]) => {
       // Parse files for items, exclude from them those that should be
       // dropped and then rewrite the file.
       const filepaths = mapUniq(defsSubset, (e) => e.source);
-      const staleDefs = this.definitions(filepaths, options);
+      const staleDefs = await this.definitions(filepaths, options);
       const updatedDefs = DefinitionArray.difference(staleDefs, defsSubset, {
         hashType,
       }).items;
@@ -244,9 +262,11 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
         filepaths,
         mapUniq(updatedDefs, (d) => d.source),
       );
+
       if (removedFiles.length) {
         filesToRemove.push({ adaptor: adaptor!, data: removedFiles });
       }
+
       if (updatedDefs.length) {
         dataToWrite.push({ adaptor: adaptor!, data: updatedDefs });
       }
@@ -258,10 +278,10 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
             adaptor!.name
           }'`,
       );
-    }
+    });
 
-    this._remove(filesToRemove, options);
-    this._write(dataToWrite, options);
+    await this._remove(filesToRemove, options);
+    return this._write(dataToWrite, options);
   }
 
   /**
@@ -273,6 +293,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     options: I_I18nUtil.DropOptions = {},
   ) {
     const { hashType = 'localeToken' } = options;
+
     return new DefinitionLoader<
       I_I18nUtil.I18nUtil,
       ReturnType<I_I18nUtil.I18nUtil['drop']>
@@ -297,7 +318,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     return this.addLocales(definitions, [locale], options);
   }
 
-  addLocales(
+  async addLocales(
     definitions: DefItemArrayLike,
     locales: any[],
     options: I_I18nUtil.AddLocaleOptions<DefItem> = {},
@@ -306,9 +327,11 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       includeMissing: true,
     });
     const { skipResolve } = optsWithDefaults;
+
     const matchedLocales = skipResolve
       ? locales
-      : this.resolveLocales([...definitions], locales, optsWithDefaults);
+      : await this.resolveLocales([...definitions], locales, optsWithDefaults);
+
     const newLocaleDefinitions = DefinitionArray.itemsByLocales(
       definitions,
       matchedLocales,
@@ -322,11 +345,12 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       def.column = undefined;
     }
 
-    this.patch(newLocaleDefinitions, {
+    await this.patch(newLocaleDefinitions, {
       ...options,
       includeMissing: true,
       addUnmatched: true,
     });
+
     return newLocaleDefinitions.items;
   }
 
@@ -338,23 +362,26 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     return this.removeLocales(definitions, [locale], options);
   }
 
-  removeLocales(
+  async removeLocales(
     definitions: DefItemArrayLike,
     locales: any[],
     options: I_I18nUtil.RemoveLocaleOptions = {},
   ) {
     const optsWithDefaults = this.effectiveOptions(options);
     const { skipResolve } = optsWithDefaults;
+
     const matchedLocales = skipResolve
       ? locales
-      : this.resolveLocales([...definitions], locales, optsWithDefaults);
+      : await this.resolveLocales([...definitions], locales, optsWithDefaults);
+
     const removedDefinitions = DefinitionArray.filterByLocales(
       definitions,
       matchedLocales,
       optsWithDefaults,
     );
 
-    this.drop(removedDefinitions, options);
+    await this.drop(removedDefinitions, options);
+
     return removedDefinitions.items;
   }
 
@@ -366,7 +393,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     return this.clearLocales(definitions, [locale], options);
   }
 
-  clearLocales(
+  async clearLocales(
     definitions: DefItemArrayLike,
     locales: any[],
     options: I_I18nUtil.ClearLocaleOptions = {},
@@ -376,34 +403,44 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       missingValue = DefinitionArray.defaults.missingValue,
       skipResolve,
     } = optsWithDefaults;
+
     const matchedLocales = skipResolve
       ? locales
-      : this.resolveLocales([...definitions], locales, optsWithDefaults);
+      : await this.resolveLocales([...definitions], locales, optsWithDefaults);
+
     // Get all keys but all with null values
     const clearedDefs = DefinitionArray.filterByLocales(
       definitions,
       matchedLocales,
     ).items.map((item) => item.copy({ value: missingValue }));
 
-    this.patch(clearedDefs, { ...options, includeMissing: true });
+    await this.patch(clearedDefs, { ...options, includeMissing: true });
+
     return clearedDefs;
   }
 
-  schema(items: I_Item.ItemArrayLike, options: I_I18nUtil.SchemaOptions = {}) {
+  async schema(
+    items: I_Item.ItemArrayLike,
+    options: I_I18nUtil.SchemaOptions = {},
+  ) {
     const optsWithDefaults = this.effectiveOptions(options);
-    const entries = this.locale(items, '*', {
+
+    const entries = await this.locale(items, '*', {
       ...optsWithDefaults,
       includeMissing: true,
       missingValue: '',
       skipResolve: true,
     });
+
     const { '*': data = {} } = this.toObject(entries, {
       ...optsWithDefaults,
       simple: true,
       merge: false,
     });
+
     const schemaOpts = merge({}, this.options, optsWithDefaults);
-    const schema = this.schemator.generate(data, schemaOpts);
+    const schema = await this.schemator.generate(data, schemaOpts);
+
     return schema;
   }
 
@@ -420,16 +457,18 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     });
   }
 
-  validate(
+  async validate(
     items: I_Item.ItemArrayLike,
     schema: AnyObj,
     options: I_I18nUtil.ValidateOptions = {},
   ) {
     const optsWithDefaults = this.effectiveOptions(options);
     const { locales = [] } = optsWithDefaults;
+
     const entries = locales?.length
-      ? this.locales(items, locales, options)
+      ? await this.locales(items, locales, options)
       : this.master(items, options);
+
     const data = this.toObject(entries, {
       ...optsWithDefaults,
       simple: true,
@@ -437,7 +476,8 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       includeMissing: true,
       locales: null,
     });
-    this.validator.validate(schema, data, optsWithDefaults);
+
+    return this.validator.validate(schema, data, optsWithDefaults);
   }
 
   /**
@@ -449,8 +489,9 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
     options: I_I18nUtil.ValidateAgainstOptions = {},
   ) {
     const { type = 'definition' } = this.effectiveOptions(options);
-    const callback = (schemaDefs: I_Item.Item[]) => {
-      const schema = this.schema(schemaDefs, options);
+
+    const callback = async (schemaDefs: I_Item.Item[]) => {
+      const schema = await this.schema(schemaDefs, options);
       return this.validate(items, schema, options);
     };
 
@@ -477,8 +518,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       ReturnType<I_I18nUtil.I18nUtil['usageAnalyze']>
     >({
       i18nUtil: this as any,
-      callback: (usage, loader) =>
-        this.usageAnalyze(definitions, usage, options),
+      callback: (usage) => this.usageAnalyze(definitions, usage, options),
     });
   }
 
@@ -491,8 +531,7 @@ export class I18nUtil extends ItemProcessor implements I_I18nUtil.I18nUtil {
       ReturnType<I_I18nUtil.I18nUtil['usageValidate']>
     >({
       i18nUtil: this as any,
-      callback: (usage, loader) =>
-        this.usageValidate(definitions, usage, options),
+      callback: (usage) => this.usageValidate(definitions, usage, options),
     });
   }
 }
@@ -544,11 +583,11 @@ export class LoadedI18nUtil extends LoadedItemProcessor
     return this.addLocales([locale], options);
   }
 
-  addLocales(
+  async addLocales(
     locales: string[],
     options?: I_I18nUtil.AddLocaleOptions<DefItem>,
   ) {
-    const addedDefinitions = this.i18nUtil.addLocales(
+    const addedDefinitions = await this.i18nUtil.addLocales(
       this.loaded,
       locales,
       options,
@@ -561,8 +600,11 @@ export class LoadedI18nUtil extends LoadedItemProcessor
     return this.removeLocales([locale], options);
   }
 
-  removeLocales(locales: string[], options?: I_I18nUtil.RemoveLocaleOptions) {
-    const removedDefinitions = this.i18nUtil.removeLocales(
+  async removeLocales(
+    locales: string[],
+    options?: I_I18nUtil.RemoveLocaleOptions,
+  ) {
+    const removedDefinitions = await this.i18nUtil.removeLocales(
       this.loaded,
       locales,
       options,
@@ -579,8 +621,11 @@ export class LoadedI18nUtil extends LoadedItemProcessor
     return this.clearLocales([locale], options);
   }
 
-  clearLocales(locales: string[], options?: I_I18nUtil.ClearLocaleOptions) {
-    const updatedDefs = this.i18nUtil.clearLocales(
+  async clearLocales(
+    locales: string[],
+    options?: I_I18nUtil.ClearLocaleOptions,
+  ) {
+    const updatedDefs = await this.i18nUtil.clearLocales(
       this.loaded,
       locales,
       options,

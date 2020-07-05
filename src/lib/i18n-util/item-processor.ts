@@ -1,3 +1,4 @@
+import differenceBy from 'lodash.differenceby';
 import merge from 'lodash.merge';
 import flatten from 'lodash.flatten';
 import groupBy from 'lodash.groupby';
@@ -15,7 +16,6 @@ import { applyStaticMixins } from '../util/apply-mixins';
 import { debug } from '../util/debug';
 import { Base, LoadedBase } from './base';
 import { mapUniq, uniqMap } from '../util/array';
-import differenceBy from 'lodash.differenceby';
 
 type DefItem = IDefinition.Item;
 type DefItemArrayLike = IDefinition.ItemArrayLike;
@@ -209,18 +209,21 @@ export class ItemProcessorMixin {
     options: I_I18nUtil.UsageValidateOptions = {},
   ) {
     const res = this.usageAnalyze(definitions, usage, options);
+
     if (res.usage.undefined.length) {
       const itemsStr = res.usage.undefined
         .map((i) => JSON.stringify(i))
         .join('\n');
       throw Error(`Found keys used without definition:\n${itemsStr}`);
     }
+
     if (res.definitions.unused.length) {
       const itemsStr = res.definitions.unused
         .map((i) => JSON.stringify(i))
         .join('\n');
       throw Error(`Found unused keys:\n${itemsStr}`);
     }
+
     if (!res.definitions.used.length) {
       debug('No match between definitions and usage.');
     }
@@ -257,7 +260,7 @@ export class ItemProcessor extends Base implements I_I18nUtil.ItemProcessor {
     return this.locales(items, [locale], options);
   }
 
-  locales(
+  async locales(
     items: I_Item.ItemArrayLike,
     locales: any[],
     options: I_I18nUtil.LocaleOptions = {},
@@ -265,8 +268,8 @@ export class ItemProcessor extends Base implements I_I18nUtil.ItemProcessor {
     const optsWithDefaults = this.effectiveOptions(options);
     const { skipResolve } = optsWithDefaults;
     const matchedLocales = skipResolve
-      ? locales
-      : this.resolveLocales(items, locales, optsWithDefaults);
+      ? (locales as string[])
+      : await this.resolveLocales(items, locales, optsWithDefaults);
     return this.constructor.locales(items, matchedLocales, optsWithDefaults);
   }
 

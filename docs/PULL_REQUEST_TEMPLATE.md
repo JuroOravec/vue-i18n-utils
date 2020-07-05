@@ -4,7 +4,7 @@
 
 <!-- Put an `x` in the boxes that apply. You can also fill these out after creating the PR. If you're unsure about any of them, don't hesitate to ask. We're here to help! This is simply a reminder of what we are going to look for before merging your code. -->
 
-- [ ] I have read the [CONTRIBUTING](https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/CONTRIBUTING.md) doc
+- [ ] I have read the [CONTRIBUTING](https://github.com/JuroOravec/i18n-util/blob/master/docs/CONTRIBUTING.md) doc
 
 - [ ] Tests for the changes have been added and are passing (for bug fixes / features). The tests should fail without the change.
 

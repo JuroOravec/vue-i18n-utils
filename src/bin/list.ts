@@ -1,4 +1,4 @@
-const Table = require('cli-table3');
+import Table from 'cli-table3';
 import { Command, CommandOptions } from 'commander';
 
 import type { Cmd } from './lib/types';
@@ -48,6 +48,7 @@ export function createListCmd(program?: Cmd, options: CommandOptions = {}) {
               key.usageFiles.join('\n'),
             ]),
           );
+
           table.options.colWidths = calcColWidths(table, {
             min: [5, 5, 5, 5, 1, 10, 10],
             max: [null, 10, 10, 12, 5],

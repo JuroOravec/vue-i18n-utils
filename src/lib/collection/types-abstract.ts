@@ -376,12 +376,12 @@ export namespace AISerializerCollection {
   /**
    * Serializer function
    */
-  export type Serializer = AnyFunc<[any, AnyObj], string>;
+  export type Serializer = AnyFunc<[any, AnyObj], string | Promise<string>>;
 
   /**
    * Deserializer function
    */
-  export type Deserializer = AnyFunc<[string, AnyObj], any>;
+  export type Deserializer = AnyFunc<[string, AnyObj], any | Promise<any>>;
 
   export interface ItemMethods {
     serializer?: Serializer;

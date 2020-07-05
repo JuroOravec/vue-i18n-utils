@@ -7,7 +7,7 @@
  *
  * See https://github.com/facebook/jest/issues/8379
  */
-const describeSkip = (desc: string, ...args: any[]) => {
+const describeSkip = (desc: string, fn?: jest.EmptyFunction): void => {
   /**
    * If we want to skip large blocks (e.g. entire file), we need at least
    * some dummy test so Jest doesn't complain

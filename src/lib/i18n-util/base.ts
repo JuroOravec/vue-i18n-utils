@@ -47,7 +47,7 @@ export class Base implements I_I18nUtil.Base {
     this.localeResolver = localeResolver ?? new GlobLocaleResolver();
     this.keyResolver = keyResolver ?? new GlobKeyResolver();
     this.valueResolver = valueResolver ?? new EvalGlobValueResolver();
-    this.schemator = schemator ?? new Schemator();
+    this.schemator = (schemator ?? new Schemator()) as ISchemator.Schemator;
     this.validator = validator ?? new Validator();
   }
 
@@ -123,9 +123,9 @@ export class Base implements I_I18nUtil.Base {
   /**
    * Common pathway for deduping, logging and resolving array of inputs
    */
-  private _resolveInputs<T extends any, R extends any>(
+  private async _resolveInputs<T extends any, R extends any>(
     inputs: T[],
-    resolver: (x: T[]) => R[],
+    resolver: (x: T[]) => R[] | Promise<R[]>,
     options: object & {
       preUniqFilter?: (x: T) => boolean | void;
       postUniqFilter?: (x: R) => boolean | void;
@@ -145,7 +145,7 @@ export class Base implements I_I18nUtil.Base {
       `Resolving ${uniqInputs.length} ${name} (${nInputDupes} duplicates ` +
         `skipped)`,
     );
-    const resolvedInputs = resolver(uniqInputs);
+    const resolvedInputs = (await resolver(uniqInputs)) as any[];
     const uniqResInputs = uniqBy(resolvedInputs, postUniqFilter);
     const nResInputsDupes = resolvedInputs.length - uniqResInputs.length;
     debug(
@@ -179,5 +179,9 @@ export class LoadedBase extends Base implements I_I18nUtil.LoadedBase {
 
   resolveKeys(keys: any[], options: I_I18nUtil.ResolveKeysOptions = {}) {
     return super.resolveKeys(this.loaded.items, keys, options);
+  }
+
+  resolveValues(values: any[], options: I_I18nUtil.ResolveValuesOptions = {}) {
+    return super.resolveValues(this.loaded.items, values, options);
   }
 }

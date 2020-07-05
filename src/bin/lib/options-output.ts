@@ -8,6 +8,7 @@ export function applyOutputOptions(
     required = false,
     desc = 'Output file where data is written.',
   } = options;
+
   const optsMethod = required ? 'requiredOption' : 'option';
   cmd[optsMethod]('-o --output <file>', desc);
 }

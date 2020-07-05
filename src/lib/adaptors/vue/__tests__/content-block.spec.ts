@@ -6,6 +6,7 @@ import { DefinitionItem } from '../../../definition';
 import { HTMLContentBlock } from '../content-block-html';
 import { DOMContentGroup } from '../content-group-dom';
 import { VueAdaptor } from '..';
+import toParams from '../../../../../test/util/to-params';
 
 describe('HTMLContentBlock', () => {
   const domContent = new DOMContentGroup();
@@ -42,79 +43,108 @@ describe('HTMLContentBlock', () => {
   });
 
   describe('isElement', () => {
-    /**
-     * Test parameters of [name, expected, block]
-     */
-    const isElementContentBlocks = [
-      ['i18nNode', true, true, i18nContentBlock],
-      ['divNode', true, false, divContentBlock],
-      ['textNode', false, false, textContentBlock],
-      ['commentNode', false, false, commentContentBlock],
-    ] as [string, boolean, boolean, HTMLContentBlock][];
+    const conditions: {
+      description: string;
+      isElement: boolean;
+      isI18nTag: boolean;
+      contentBlock: HTMLContentBlock;
+    }[] = [
+      {
+        description: 'i18nNode',
+        isElement: true,
+        isI18nTag: true,
+        contentBlock: i18nContentBlock,
+      },
+      {
+        description: 'divNode',
+        isElement: true,
+        isI18nTag: false,
+        contentBlock: divContentBlock,
+      },
+      {
+        description: 'textNode',
+        isElement: false,
+        isI18nTag: false,
+        contentBlock: textContentBlock,
+      },
+      {
+        description: 'commentNode',
+        isElement: false,
+        isI18nTag: false,
+        contentBlock: commentContentBlock,
+      },
+    ];
 
-    describe.each(isElementContentBlocks)(
+    describe.each(toParams(conditions))(
       'for %s',
-      (name, expectedIsEl, expectedIsI18nEl, contentBlock) => {
-        test(`is ${expectedIsEl} for default`, () => {
-          expect(contentBlock.isElement()).toBe(expectedIsEl);
+      (desc, { isElement, isI18nTag, contentBlock }) => {
+        test(`is ${isElement} for default`, () => {
+          expect(contentBlock.isElement()).toBe(isElement);
         });
 
-        test(`is ${expectedIsI18nEl} for 'i18n'`, () => {
-          expect(contentBlock.isElement('i18n')).toBe(expectedIsI18nEl);
+        test(`is ${isI18nTag} for 'i18n'`, () => {
+          expect(contentBlock.isElement('i18n')).toBe(isI18nTag);
         });
       },
     );
   });
 
   describe('getVirtualContent', () => {
-    type VirContentBlockParam = [
-      string,
-      { json: boolean; yaml: boolean; expected: any },
-      HTMLContentBlock,
-    ];
-    /**
-     * Test parameters of [name, expected, contentBlock]
-     */
-    const getVirtualContentBlocks: VirContentBlockParam[] = [
-      [
-        'emptyNode',
-        { json: true, yaml: true, expected: {} },
-        emptyContentBlock,
-      ],
-      [
-        'jsonNode',
-        { json: true, yaml: true, expected: { doug: 'dimmajson' } },
-        jsonContentBlock,
-      ],
-      [
-        'yamlNode',
-        { json: false, yaml: true, expected: { goud: 'dimmayaml' } },
-        yamlContentBlock,
-      ],
+    const conditions: {
+      description: string;
+      json: boolean;
+      yaml: boolean;
+      expected: any;
+      contentBlock: HTMLContentBlock;
+    }[] = [
+      {
+        description: 'emptyNode',
+        json: true,
+        yaml: true,
+        expected: {},
+        contentBlock: emptyContentBlock,
+      },
+      {
+        description: 'jsonNode',
+        json: true,
+        yaml: true,
+        expected: { doug: 'dimmajson' },
+        contentBlock: jsonContentBlock,
+      },
+      {
+        description: 'yamlNode',
+        json: false,
+        yaml: true,
+        expected: { goud: 'dimmayaml' },
+        contentBlock: yamlContentBlock,
+      },
     ];
 
-    test("returns undefined if vContent doesn't exist yet it has no serializers", () => {
+    test("returns undefined if vContent doesn't exist yet it has no serializers", async () => {
       const contentBlock = newContentBlock({ serializers: undefined });
-      expect(contentBlock.getVirtualContent()).toBeUndefined();
+      expect(await contentBlock.getVirtualContent()).toBeUndefined();
     });
 
-    test("returns empty object if vContent doesn't exist yet and content is falsy", () => {
+    test("returns empty object if vContent doesn't exist yet and content is falsy", async () => {
       const contentBlock = newContentBlock();
-      expect(contentBlock.getVirtualContent()).toEqual({});
+      expect(await contentBlock.getVirtualContent()).toEqual({});
     });
 
-    test('returns the same object if vContent is accessed multiple times', () => {
+    test('returns the same object if vContent is accessed multiple times', async () => {
       const contentBlock = newContentBlock();
-      const vContent1 = contentBlock.getVirtualContent();
+
+      const vContent1 = await contentBlock.getVirtualContent();
       expect(vContent1).toEqual({});
+
       vContent1.test = 22;
-      const vContent2 = contentBlock.getVirtualContent();
+
+      const vContent2 = await contentBlock.getVirtualContent();
       expect(vContent2).toEqual(vContent1);
     });
 
-    describe.each(getVirtualContentBlocks)(
+    describe.each(toParams(conditions))(
       'for %s',
-      (name, { json, yaml, expected }, contentBlock) => {
+      (desc, { json, yaml, expected, contentBlock }) => {
         const jsonBeh = json ? 'works' : 'throws';
         const yamlbeh = yaml ? 'works' : 'throws';
 
@@ -122,31 +152,31 @@ describe('HTMLContentBlock', () => {
           contentBlock.virtualContent = undefined;
         });
 
-        test(`${jsonBeh} if contentBlock's 'lang' attr set to 'json'`, () => {
+        test(`${jsonBeh} if contentBlock's 'lang' attr set to 'json'`, async () => {
           contentBlock.setAttribute('lang', 'json');
-          if (json) {
-            expect(contentBlock.getVirtualContent()).toEqual(expected);
-          } else {
-            expect(() => contentBlock.getVirtualContent()).toThrow();
-          }
+          json
+            ? expect(await contentBlock.getVirtualContent()).toEqual(expected)
+            : await expect(() =>
+                contentBlock.getVirtualContent(),
+              ).rejects.toThrow();
         });
 
-        test(`${yamlbeh} if contentBlock's 'lang' attr set to 'yaml'`, () => {
+        test(`${yamlbeh} if contentBlock's 'lang' attr set to 'yaml'`, async () => {
           contentBlock.setAttribute('lang', 'yaml');
-          if (yaml) {
-            expect(contentBlock.getVirtualContent()).toEqual(expected);
-          } else {
-            expect(() => contentBlock.getVirtualContent()).toThrow();
-          }
+          yaml
+            ? expect(await contentBlock.getVirtualContent()).toEqual(expected)
+            : await expect(() =>
+                contentBlock.getVirtualContent(),
+              ).rejects.toThrow();
         });
 
-        test(`'lang' attr defaults to 'json'`, () => {
+        test(`'lang' attr defaults to 'json'`, async () => {
           contentBlock.removeAttribute('lang');
-          if (json) {
-            expect(contentBlock.getVirtualContent()).toEqual(expected);
-          } else {
-            expect(() => contentBlock.getVirtualContent()).toThrow();
-          }
+          json
+            ? expect(await contentBlock.getVirtualContent()).toEqual(expected)
+            : await expect(() =>
+                contentBlock.getVirtualContent(),
+              ).rejects.toThrow();
         });
       },
     );
@@ -170,6 +200,7 @@ describe('HTMLContentBlock', () => {
         locale: 'fr',
       }),
     ];
+
     const definitionsWithConflicts = [
       ...definitions,
       new DefinitionItem({
@@ -178,6 +209,7 @@ describe('HTMLContentBlock', () => {
         locale: 'en',
       }),
     ];
+
     const definitionsWithMissing = [
       ...definitions,
       // Default missing value
@@ -200,76 +232,111 @@ describe('HTMLContentBlock', () => {
       fr: { foolf: null },
     });
 
-    const langs = [
-      ['json', JSON.stringify],
-      ['yaml', yaml.safeDump],
-      [undefined, JSON.stringify],
-    ] as [string, AnyFunc<any, string>][];
-    const locales = [['en'], [undefined]] as ['en' | 'fr' | undefined][];
+    const langConditions: {
+      description: string;
+      lang: string | undefined;
+      serializer: AnyFunc<any, string>;
+    }[] = [
+      { description: 'json', lang: 'json', serializer: JSON.stringify },
+      { description: 'yaml', lang: 'yaml', serializer: yaml.safeDump },
+      { description: 'undefined', lang: undefined, serializer: JSON.stringify },
+    ];
 
-    test('returns empty object on empty definitions array', () => {
+    const localeConditions: {
+      description: string;
+      locale: keyof typeof definitionsObj | undefined;
+    }[] = [
+      { description: 'en', locale: 'en' },
+      { description: 'undefined', locale: undefined },
+    ];
+
+    test('returns empty object on empty definitions array', async () => {
       const contentBlock = newContentBlock();
-      const content = contentBlock.serializeItems([]);
+      const content = await contentBlock.serializeItems([]);
+
       expect(JSON.parse(content)).toEqual({});
     });
 
-    test('throws if multiple items define the same key', () => {
+    test('throws if multiple items define the same key', async () => {
       const contentBlock = newContentBlock();
-      expect(() =>
+
+      await expect(async () =>
         contentBlock.serializeItems(definitionsWithConflicts),
-      ).toThrow();
+      ).rejects.toThrow();
     });
 
     describe('missing values', () => {
-      test('are not included by defualt', () => {
+      test('are not included by defualt', async () => {
         const contentBlock = newContentBlock();
-        const content = contentBlock.serializeItems(definitionsWithMissing);
+        const content = await contentBlock.serializeItems(
+          definitionsWithMissing,
+        );
+
         expect(JSON.parse(content)).toEqual(definitionsWithMissingNoNullObj);
       });
 
-      test(`are included if 'includeMissing' is truthy`, () => {
+      test(`are included if 'includeMissing' is truthy`, async () => {
         const contentBlock = newContentBlock();
-        const content = contentBlock.serializeItems(definitionsWithMissing, {
-          includeMissing: true,
-        });
+        const content = await contentBlock.serializeItems(
+          definitionsWithMissing,
+          {
+            includeMissing: true,
+          },
+        );
+
         expect(JSON.parse(content)).toEqual(definitionsWithMissingObj);
       });
 
-      test(`can be specified by 'missingValue'`, () => {
+      test(`can be specified by 'missingValue'`, async () => {
         const contentBlock = newContentBlock();
-        const content = contentBlock.serializeItems(definitionsWithMissing, {
-          includeMissing: false,
-          missingValue: 22,
-        });
+        const content = await contentBlock.serializeItems(
+          definitionsWithMissing,
+          {
+            includeMissing: false,
+            missingValue: 22,
+          },
+        );
+
         expect(JSON.parse(content)).toEqual(definitionsWithMissingNo22Obj);
       });
     });
 
-    describe.each(langs)('with attr lang=%s', (lang, serializer) => {
-      test(`returns items serialized to ${lang ?? 'json'}`, () => {
-        const contentBlock = newContentBlock({
-          attributes: {
-            ...(lang ? { lang } : {}),
-          },
-        });
-        const content = contentBlock.serializeItems(definitions);
-        const expected = serializer(definitionsObj);
-        expect(content).toBe(expected);
-      });
-    });
+    describe.each(toParams(langConditions))(
+      'with attr lang=%s',
+      (desc, { lang, serializer }) => {
+        test(`returns items serialized to ${lang ?? 'json'}`, async () => {
+          const contentBlock = newContentBlock({
+            attributes: {
+              ...(lang ? { lang } : {}),
+            },
+          });
 
-    describe.each(locales)('with attr locale=%s', (locale) => {
-      const expectedDesc = locale ? 'locale-scoped portion of' : 'all';
-      test(`returns ${expectedDesc} data from items`, () => {
-        const contentBlock = newContentBlock({
-          attributes: {
-            ...(locale ? { locale } : {}),
-          },
+          const content = await contentBlock.serializeItems(definitions);
+          const expected = await serializer(definitionsObj);
+
+          expect(content).toBe(expected);
         });
-        const content = contentBlock.serializeItems(definitions);
-        const expected = locale ? definitionsObj[locale] : definitionsObj;
-        expect(JSON.parse(content)).toEqual(expected);
-      });
-    });
+      },
+    );
+
+    describe.each(toParams(localeConditions))(
+      'with attr locale=%s',
+      (desc, { locale }) => {
+        const expectedDesc = locale ? 'locale-scoped portion of' : 'all';
+
+        test(`returns ${expectedDesc} data from items`, async () => {
+          const contentBlock = newContentBlock({
+            attributes: {
+              ...(locale ? { locale } : {}),
+            },
+          });
+
+          const content = await contentBlock.serializeItems(definitions);
+          const expected = locale ? definitionsObj[locale] : definitionsObj;
+
+          expect(JSON.parse(content)).toEqual(expected);
+        });
+      },
+    );
   });
 });

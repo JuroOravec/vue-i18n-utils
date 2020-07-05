@@ -137,9 +137,6 @@ a {
 }
 </style>
 
-
-
-
 <i18n locale="ja">
 {
   "message": {

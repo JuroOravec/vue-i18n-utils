@@ -10,7 +10,7 @@ export namespace IContentFormatter {
     /**
      * Formats serialized content of ContentBlock.
      */
-    formatContent: (block: string) => string;
+    formatContent: (block: string) => string | Promise<string>;
 
     /**
      * Formats serialized content of ContentBlock including any additional
@@ -18,12 +18,12 @@ export namespace IContentFormatter {
      *
      * Used when joining multiple ContentBlocks of ContentGroup.
      */
-    formatBlock: (block: string) => string;
+    formatBlock: (block: string) => string | Promise<string>;
 
     /**
      * Formats serialized content of ContentGroup.
      */
-    formatGroup: (content: string) => string;
+    formatGroup: (content: string) => string | Promise<string>;
   }
 
   export interface CtorOptions {

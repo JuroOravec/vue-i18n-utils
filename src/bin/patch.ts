@@ -46,7 +46,7 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
             optionalArgCount: 1,
           },
         },
-        ({
+        async ({
           i18nUtil,
           defItems,
           opts,
@@ -64,6 +64,7 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
             [...defItems, ...patchDefItems],
             'locale',
           );
+
           const patchDefItemsFromUsage = flatten(
             locales.map((locale) =>
               patchUseItems.map(
@@ -76,6 +77,7 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
               ),
             ),
           );
+
           // Join items from def and use files, and keep values from def files.
           // This is part of the set of values that we will patch to targets.
           const patcherItemsFromFiles = DefinitionArray.updateBy(
@@ -116,7 +118,7 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
           ).items;
 
           // Resolve string values from cli and process these args into definitions
-          const resolvedArgResults = processVariadicArgs(
+          const resolvedArgResults = (await processVariadicArgs(
             mergedDefs.items,
             addArgs,
             {
@@ -128,8 +130,10 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
                   i18nUtil.resolveLocales(items, lcls, unknownOpts),
               ],
             },
-          ) as [string[][], any[], string[]][];
+          )) as [string[][], any[], string[]][];
+
           const patcherItemsFromCli = [] as IDefinition.Item[];
+
           for (const [
             addPaths,
             [value],
@@ -152,7 +156,9 @@ export function createPatchCmd(program?: Cmd, options: CommandOptions = {}) {
           ).items;
 
           // We use `patchTo` to autofill the `source` prop if `sink` arg given.
-          i18nUtil.patchTo(defItems, updateOpts).loadFromItems(patcherItems);
+          await i18nUtil
+            .patchTo(defItems, updateOpts)
+            .loadFromItems(patcherItems);
         },
       ),
     );

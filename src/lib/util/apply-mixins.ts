@@ -1,4 +1,4 @@
-export function applyMixins(derivedCtor: any, baseCtors: any[]) {
+export function applyMixins(derivedCtor: any, baseCtors: any[]): void {
   baseCtors.forEach((baseCtor) => {
     Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
       Object.defineProperty(
@@ -10,7 +10,7 @@ export function applyMixins(derivedCtor: any, baseCtors: any[]) {
   });
 }
 
-export function applyStaticMixins(derivedCtor: any, baseCtors: any[]) {
+export function applyStaticMixins(derivedCtor: any, baseCtors: any[]): void {
   baseCtors.forEach((baseCtor) => {
     class DummyClass {}
     const defaultClassProps = Object.getOwnPropertyNames(DummyClass);

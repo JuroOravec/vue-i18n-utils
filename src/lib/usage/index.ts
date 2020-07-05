@@ -21,7 +21,7 @@ export class UsageItem extends Item implements IUsage.Item {
     this.origin = origin;
   }
 
-  copy(newValuesObj: Partial<IUsage.CtorOptions> = {}) {
+  copy(newValuesObj: Partial<IUsage.CtorOptions> = {}): IUsage.Item {
     return super.copy(newValuesObj) as IUsage.Item;
   }
 

@@ -1,3 +1,4 @@
+import toParams from '../../../../test/util/to-params';
 import type { IDefinition } from '../../definition/types';
 import type { ISchemator } from '../../schemator/types';
 import { LoadedI18nUtil } from '..';
@@ -38,15 +39,16 @@ parametrizeInstance(
         if (schemaSpy) schemaSpy.mockClear();
       });
 
-      test('returns empty object schema from empty array', () => {
+      test('returns empty object schema from empty array', async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        const schema =
-          i18nUtil instanceof LoadedI18nUtil
-            ? i18nUtil.schema()
-            : i18nUtil.schema(defs);
+
+        const schema = await (i18nUtil instanceof LoadedI18nUtil
+          ? i18nUtil.schema()
+          : i18nUtil.schema(defs));
 
         expect(schemaSpy).toBeCalled();
         expect(schemaSpy).toBeCalledTimes(1);
@@ -57,17 +59,34 @@ parametrizeInstance(
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test.each([
-        ['master schema', { scope: 'master' }, fullSchemaMaster],
-        ['locale schema', { scope: 'locale' }, fullSchemaLocale],
-        ['default schema', {}, fullSchemaLocale],
-      ] as [string, ISchemator.GenerateOptions, any][])(
+      const schemaParams: {
+        description: string;
+        options: ISchemator.GenerateOptions;
+        expected: any;
+      }[] = [
+        {
+          description: 'master schema',
+          options: { scope: 'master' },
+          expected: fullSchemaMaster,
+        },
+        {
+          description: 'locale schema',
+          options: { scope: 'locale' },
+          expected: fullSchemaLocale,
+        },
+        {
+          description: 'default schema',
+          options: {},
+          expected: fullSchemaLocale,
+        },
+      ];
+
+      test.each(toParams(schemaParams))(
         'returns %s object from array of definitions',
-        (desc, opts, expected) => {
-          const schema =
-            i18nUtil instanceof LoadedI18nUtil
-              ? i18nUtil.schema(opts)
-              : i18nUtil.schema(definitions, opts);
+        async (desc, { options, expected }) => {
+          const schema = await (i18nUtil instanceof LoadedI18nUtil
+            ? i18nUtil.schema(options)
+            : i18nUtil.schema(definitions, options));
 
           expect(schemaSpy).toBeCalled();
           expect(schemaSpy).toBeCalledTimes(1);
@@ -79,15 +98,16 @@ parametrizeInstance(
         },
       );
 
-      test('returns object schema with keys taken from all locales', () => {
+      test('returns object schema with keys taken from all locales', async () => {
         const defs = definitionsJY as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        const schema =
-          i18nUtil instanceof LoadedI18nUtil
-            ? i18nUtil.schema()
-            : i18nUtil.schema(defs);
+
+        const schema = await (i18nUtil instanceof LoadedI18nUtil
+          ? i18nUtil.schema()
+          : i18nUtil.schema(defs));
 
         expect(schemaSpy).toBeCalled();
         expect(schemaSpy).toBeCalledTimes(1);
@@ -98,15 +118,16 @@ parametrizeInstance(
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('options are passed to schema generator', () => {
+      test('options are passed to schema generator', async () => {
         const options = { test: 'confirmed' };
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? i18nUtil.schema(options)
-          : i18nUtil.schema(definitions, options);
+          : i18nUtil.schema(definitions, options));
 
         expect(schemaSpy).toBeCalled();
         expect(schemaSpy).toBeCalledTimes(1);
+
         expect(schemaSpy.mock.calls[0][1]).toBeDefined();
         expect(schemaSpy.mock.calls[0][1].test).toBe('confirmed');
 

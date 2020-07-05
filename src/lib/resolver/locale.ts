@@ -31,7 +31,7 @@ export class NullLocaleResolver extends AbstractLocaleResolver
     super(options);
   }
 
-  resolve<T extends any>(locales: T[], items: I_Item.Item[], options = {}) {
+  resolve<T extends any>(locales: T[], items: any[], options = {}): T[] {
     this.logger(`Returning locales '${locales.map(String).join("', '")}'.`);
     return locales;
   }
@@ -59,9 +59,11 @@ export class GlobLocaleResolver extends AbstractLocaleResolver
     globs: string[],
     items: T[],
     options: IResolver.Locale.Glob.ResolveOptions = {},
-  ) {
-    const globsReadable = globs.map(String).join("', '");
+  ): NonNullable<T['locale']>[] {
     const opts = merge({}, this.options, options);
+
+    const globsReadable = globs.map(String).join("', '");
+
     const unmatchedLocales = new Set(ItemArray.uniqProp(items, 'locale'));
     const matchedLocales = [] as NonNullable<T['locale']>[];
 
@@ -75,6 +77,7 @@ export class GlobLocaleResolver extends AbstractLocaleResolver
           matched = true;
         }
       });
+
       if (!matched && !isGlob(glob, { strict: false })) {
         // If there was no match, and it is non-glob, treat it as regular
         // string. Required so that resolver allows to introduce new locales
@@ -82,12 +85,14 @@ export class GlobLocaleResolver extends AbstractLocaleResolver
         matchedLocales.push(glob as NonNullable<T['locale']>);
       }
     }
+
     this.logger(
       `Done resolving locales. Globs '${globsReadable}' matched ` +
         `${matchedLocales.length} locales: '${matchedLocales
           .map(String)
           .join("', '")}'.`,
     );
+
     return matchedLocales;
   }
 

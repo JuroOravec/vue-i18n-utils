@@ -63,7 +63,9 @@ export class GlobValueResolver extends AbstractValueResolver
   ) {
     const globsReadable = globs.join("', '");
     this.logger(`Resolving values for globs '${globsReadable}'.`);
+
     const values = this._resolve(globs, items, options);
+
     this.logger(
       `Done resolving values. Globs '${globsReadable}' matched ` +
         `${values.length} values: '${values.map(String).join("', '")}'.`,
@@ -124,6 +126,7 @@ export class EvalGlobValueResolver extends GlobValueResolver
   ) {
     const globsReadable = globs.map(String).join("', '");
     this.logger(`Resolving values for inputs '${globsReadable}'.`);
+
     const { js = [], glob = [] } = groupBy(globs, (s) =>
       s.startsWith('!js:') ? 'js' : 'glob',
     );
@@ -131,10 +134,12 @@ export class EvalGlobValueResolver extends GlobValueResolver
       ...js.map((s) => eval(s.slice(4))),
       ...this._resolve(glob, items, options),
     ];
+
     this.logger(
       `Done resolving values. Inputs '${globsReadable}' matched ` +
         `${values.length} values: '${values.map(String).join("', '")}'.`,
     );
+
     return values;
   }
 }

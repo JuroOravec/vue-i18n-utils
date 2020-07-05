@@ -3,7 +3,7 @@ import type { I_Item } from '../../item/types';
 import { DefinitionLoader, UsageLoader, LoaderBase } from '../loader';
 import {
   definitionConditions,
-  LoaderParam,
+  LoaderCond,
   usageConditions,
 } from './loader-conds';
 import { createI18nUtil } from './i18n-util-conds';
@@ -11,35 +11,35 @@ import { validateItems } from './item-processor-helpers';
 import { I18nUtil } from '..';
 import { DefinitionItem } from '../../definition';
 import { UsageItem } from '../../usage';
+import toParams from '../../../../test/util/to-params';
 
 describe('Loader', () => {
-  type LoaderCond = [
-    string,
-    new (...args: any[]) => I_I18nUtil.Loader,
-    (keyof I_I18nUtil.Loader)[],
-    LoaderParam[],
-    new (...args: any[]) => I_Item.Item,
-  ];
-  const conditions: LoaderCond[] = [
-    [
-      DefinitionLoader.name,
-      DefinitionLoader,
-      ['loadFromFiles', 'loadFromItems', 'loadFromObjects'],
-      definitionConditions,
-      DefinitionItem,
-    ],
-    [
-      UsageLoader.name,
-      UsageLoader,
-      ['loadFromFiles', 'loadFromItems', 'loadFromObjects'],
-      usageConditions,
-      UsageItem,
-    ],
+  const conditionGroups: {
+    description: string;
+    class: new (...args: any[]) => I_I18nUtil.Loader<any, any, any>;
+    methodNames: (keyof I_I18nUtil.Loader)[];
+    conditions: LoaderCond[];
+    itemClass: new (...args: any[]) => I_Item.Item;
+  }[] = [
+    {
+      description: DefinitionLoader.name,
+      class: DefinitionLoader,
+      methodNames: ['loadFromFiles', 'loadFromItems', 'loadFromObjects'],
+      conditions: definitionConditions,
+      itemClass: DefinitionItem,
+    },
+    {
+      description: UsageLoader.name,
+      class: UsageLoader,
+      methodNames: ['loadFromFiles', 'loadFromItems', 'loadFromObjects'],
+      conditions: usageConditions,
+      itemClass: UsageItem,
+    },
   ];
 
-  describe.each(conditions)(
+  describe.each(toParams(conditionGroups))(
     '%s',
-    (name, klass, methodNames, conds, itemClass) => {
+    (desc, { class: klass, methodNames, conditions, itemClass }) => {
       let loader: I_I18nUtil.Loader;
 
       const cb: I_I18nUtil.Loader['callback'] = (items, ctx) => {
@@ -85,15 +85,15 @@ describe('Loader', () => {
             loader.callback = checkReturnCbMock;
           });
 
-          test('calls callback', () => {
-            callMethod([]);
+          test('calls callback', async () => {
+            await callMethod([]);
 
             expect(checkReturnCbMock).toBeCalledTimes(1);
             expect(checkReturnCbMock.mock.calls[0]).toHaveLength(2);
           });
 
-          test("returns callback's return value", () => {
-            const res = callMethod([]);
+          test("returns callback's return value", async () => {
+            const res = await callMethod([]);
 
             expect(checkReturnCbMock).toBeCalledTimes(1);
             expect(checkReturnCbMock.mock.calls[0]).toHaveLength(2);
@@ -102,7 +102,7 @@ describe('Loader', () => {
           });
         });
 
-        describe.each(conds)(
+        describe.each(toParams(conditions))(
           '%s',
           (desc, { items, files, objects, throws, options }) => {
             const argMap = {
@@ -114,21 +114,21 @@ describe('Loader', () => {
 
             const shouldThrow = throws && method !== 'loadFromItems';
 
-            test('loads items (empty)', () => {
-              const res = callMethod([], options);
+            test('loads items (empty)', async () => {
+              const res = await callMethod([], options);
               validateItems(res, [], itemClass);
             });
 
             if (shouldThrow) {
-              test('throws', () => {
-                const action = () => callMethod(arg, options);
-                expect(action).toThrow();
+              test('throws', async () => {
+                const action = async () => callMethod(arg, options);
+                await expect(action).rejects.toThrow();
               });
             }
 
             if (!shouldThrow && arg !== undefined) {
-              test('loads items', () => {
-                const res = callMethod(arg, options);
+              test('loads items', async () => {
+                const res = await callMethod(arg, options);
                 validateItems(res, items, itemClass);
               });
             }

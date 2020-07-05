@@ -28,7 +28,7 @@ Also check out [Source Version Control and Workflow][svc_and_workflow], which ta
 To get started with the project, clone it from GitHub.
 
 ```shell
-git clone https://github.com/JuroOravec/vue-i18n-utils.git
+git clone https://github.com/JuroOravec/i18n-util.git
 cd instance-manager
 npm install
 ```
@@ -144,5 +144,5 @@ semantic-release has a `--no-ci` flag. See semantic-release for
 
 Table of contents generated with [markdown-toc](http://ecotrust-canada.github.io/markdown-toc).
 
-[svc_and_workflow]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/source_control_and_workflow.md
-[contributing]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/CONTRIBUTING.md
+[svc_and_workflow]: https://github.com/JuroOravec/i18n-util/blob/master/docs/source_control_and_workflow.md
+[contributing]: https://github.com/JuroOravec/i18n-util/blob/master/docs/CONTRIBUTING.md
