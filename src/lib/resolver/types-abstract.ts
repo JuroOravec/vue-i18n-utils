@@ -16,10 +16,10 @@ export namespace AIResolver {
    */
   export abstract class Resolver {
     options = {} as object;
+
     logger = {} as (msg: string) => void;
-    resolve(inputs: any[], ...args: any[]) {
-      return inputs as any[];
-    }
+
+    resolve = {} as (inputs: any[], ...args: any[]) => any[] | Promise<any[]>;
   }
 
   export type ResolveOptions = AnyObj;
@@ -29,30 +29,33 @@ export namespace AIResolver {
   }
 
   export abstract class PathResolver extends Resolver {
-    resolve(paths: any[], options?: ResolveOptions) {
-      return paths as string[];
-    }
+    resolve = {} as (
+      paths: any[],
+      options?: ResolveOptions,
+    ) => string[] | Promise<string[]>;
   }
 
   export abstract class LocaleResolver extends Resolver {
-    resolve(
+    resolve = {} as (
       locales: any[],
-      items: { locale?: any }[],
+      items: (any & { locale?: any })[],
       options?: ResolveOptions,
-    ) {
-      return locales as string[];
-    }
+    ) => string[] | Promise<string[]>;
   }
 
   export abstract class KeyResolver extends Resolver {
-    resolve(keys: any[], items: { path?: any }[], options?: ResolveOptions) {
-      return keys as string[][];
-    }
+    resolve = {} as (
+      keys: any[],
+      items: (any & { path?: any })[],
+      options?: ResolveOptions,
+    ) => string[][] | Promise<string[][]>;
   }
 
   export abstract class ValueResolver extends Resolver {
-    resolve(values: any[], items: { value?: any }[], options?: ResolveOptions) {
-      return values as any[];
-    }
+    resolve = {} as (
+      values: any[],
+      items: ({ value?: any } & any)[],
+      options?: ResolveOptions,
+    ) => any[] | Promise<any[]>;
   }
 }

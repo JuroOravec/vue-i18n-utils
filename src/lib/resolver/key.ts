@@ -34,7 +34,11 @@ export class NullKeyResolver extends AbstractKeyResolver
     super(options);
   }
 
-  resolve<T extends string[]>(keys: T[], items: I_Item.Item[], options = {}) {
+  resolve<T extends string[]>(
+    keys: T[],
+    items: I_Item.Item[],
+    options = {},
+  ): T[] {
     this.logger(`Returning keys '${keys.map(String).join("', '")}'.`);
     return keys;
   }
@@ -62,14 +66,18 @@ export class GlobKeyResolver extends AbstractKeyResolver
     globs: string[],
     items: T[],
     options: IResolver.Key.Glob.ResolveOptions = {},
-  ) {
+  ): string[][] {
     const globsReadable = globs.map(String).join("', '");
+
     this.logger(`Resolving keys for globs '${globsReadable}'.`);
+
     const { keys, paths } = this._resolve(globs, items, options);
+
     this.logger(
       `Done resolving keys. Globs '${globsReadable}' matched ` +
         `${keys.length} keys: '${keys.map(String).join("', '")}'.`,
     );
+
     return paths;
   }
 

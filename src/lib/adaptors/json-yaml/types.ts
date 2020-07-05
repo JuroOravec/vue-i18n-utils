@@ -27,12 +27,7 @@ export namespace IAdaptorJsonYaml {
 
   export interface ContentGroupCtorOptions
     extends IContentGroup.CtorOptions,
-      LoggerOption {
-    /**
-     * JSON / YAML data
-     */
-    content?: string;
-  }
+      LoggerOption {}
 
   export type Deserializer = typeof JSON.parse | typeof yaml.safeLoad;
   export type DeserializerOptions = Parameters<Deserializer>[1];

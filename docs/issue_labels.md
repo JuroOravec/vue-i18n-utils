@@ -144,7 +144,7 @@ pipeline can be roughly illustrated as below:
 #### Issue Pipeline
 
 <figure>
-  <img src="https://raw.githubusercontent.com/JuroOravec/vue-i18n-utils/master/docs/issue_pipeline.png" alt="Issue Pipeline and Labelling"/>
+  <img src="https://raw.githubusercontent.com/JuroOravec/i18n-util/master/docs/issue_pipeline.png" alt="Issue Pipeline and Labelling"/>
   <figcaption>
   <strong>Issue Pipeline and Labelling</strong>
   - Issue pipeline inspired by TypeScript and Yoast. Labels are used for

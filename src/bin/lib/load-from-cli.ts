@@ -1,5 +1,6 @@
 import fromPairs from 'lodash.frompairs';
 
+import type { UnwrapPromise } from '../../types';
 import type { I_I18nUtil } from '../../lib/i18n-util/types';
 import type { IDefinition } from '../../lib/definition/types';
 import type { IUsage } from '../../lib/usage/types';
@@ -32,9 +33,9 @@ export function loadFromCli<A extends string, R extends any>(
     useItems: IUsage.Item[];
     auxDefItems: IDefinition.Item[];
     auxUseItems: IUsage.Item[];
-  }) => R,
+  }) => R extends Promise<any> ? Promise<UnwrapPromise<R>> : R,
 ) {
-  return function (posArgs: string[], cmd: Cmd) {
+  return async function (posArgs: string[], cmd: Cmd) {
     const {
       program = cmd,
       args: knownArgs = [],
@@ -59,11 +60,11 @@ export function loadFromCli<A extends string, R extends any>(
 
     // Get items as specified by positional args. These are the items targetted
     // by the command.
-    const { defItems, useItems, unparsed: nonItemOpts } = processItemOptions(
-      i18nUtil,
-      paths,
-      nonGenOpts as any,
-    );
+    const {
+      defItems,
+      useItems,
+      unparsed: nonItemOpts,
+    } = await processItemOptions(i18nUtil, paths, nonGenOpts as any);
 
     // Some commands allow to specify additional def / use files whose values
     // help to prepare conditions under which the target items will be changed.
@@ -72,7 +73,7 @@ export function loadFromCli<A extends string, R extends any>(
       useItems: auxUseItems,
       unparsed: nonAuxOpts,
     } = auxFiles
-      ? processAuxFilesOptions(i18nUtil, [], nonGenOpts as any)
+      ? await processAuxFilesOptions(i18nUtil, [], nonGenOpts as any)
       : { defItems: [], useItems: [], unparsed: {} };
 
     // Since user may specify custom components (DI) in the config, we pass

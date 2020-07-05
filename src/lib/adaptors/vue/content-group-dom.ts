@@ -1,4 +1,4 @@
-import fs from 'fs';
+import { promises as fsp } from 'fs';
 import jsdom from 'jsdom';
 
 import type { IDefinition } from '../../definition/types';
@@ -34,11 +34,11 @@ export interface IDOMContentGroup extends IContentGroup.ContentGroup {
   resolveItems: (
     definitions: IDefinition.Item[],
     options: IContentGroup.ResolveItemsOptions,
-  ) => {
+  ) => Promise<{
     matched: Map<IHTMLContentBlock, IDefinition.Item[]>;
     prepend: Map<string, IDefinition.Item[]>;
     append: Map<string, IDefinition.Item[]>;
-  };
+  }>;
 }
 
 // Note:
@@ -104,7 +104,7 @@ export class DOMContentGroup extends ContentGroup implements IDOMContentGroup {
   }
 
   remove(block: IContentBlock.ContentBlock) {
-    return super.remove(block) as IHTMLContentBlock | undefined;
+    return super.remove(block);
   }
 
   insert(
@@ -166,14 +166,15 @@ export class DOMContentGroup extends ContentGroup implements IDOMContentGroup {
     return this.insert(block, insertOptions);
   }
 
-  resolveItems(
+  async resolveItems(
     definitions: IDefinition.Item[],
     options: IContentGroup.ResolveItemsOptions = {},
   ) {
-    const resolved = super.resolveItems(definitions, {
+    const resolved = await super.resolveItems(definitions, {
       query: (b) => (b as IHTMLContentBlock).isElement('i18n'),
       ...options,
     });
+
     return resolved as {
       matched: Map<IHTMLContentBlock, IDefinition.Item[]>;
       prepend: Map<string, IDefinition.Item[]>;
@@ -181,19 +182,19 @@ export class DOMContentGroup extends ContentGroup implements IDOMContentGroup {
     };
   }
 
-  static fromFile(
+  static async fromFile(
     url: string,
     options: { invalidPathOk?: boolean } & jsdom.ConstructorOptions &
       IContentGroup.CtorOptions &
-      Extract<Parameters<typeof fs.readFileSync>[1], object> = {},
+      Extract<Parameters<typeof fsp.readFile>[1], object> = {},
   ) {
     debug(`Reading file '${url}'`);
     let content: string | undefined = undefined;
     try {
-      content = fs.readFileSync(url, {
+      content = (await fsp.readFile(url, {
         encoding: 'utf-8',
         ...options,
-      }) as string;
+      })) as string;
     } catch (e) {
       if (!options.invalidPathOk) throw e;
     }

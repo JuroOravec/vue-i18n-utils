@@ -401,12 +401,12 @@ Table of contents generated with [markdown-toc](http://ecotrust-canada.github.io
 <!-- Links within the repo grouped together to easilyl track things like directory
 change, name/repo change, etc. -->
 
-[issues]: https://github.com/JuroOravec/vue-i18n-utils/issues
-[issue_labels]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/issue_labels.md
-[issue_labels@status]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/issue_labels.md#status
-[svc_and_workflow]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/source_control_and_workflow.md
-[logging]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/logging.md
-[code_of_conduct]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/CODE_OF_CONDUCT.md
-[pull_request_template]: https://github.com/JuroOravec/vue-i18n-utils/tree/master/docs/PULL_REQUEST_TEMPLATE.md
-[feature_request_template]: https://github.com/JuroOravec/vue-i18n-utils/blob/master/docs/ISSUE_TEMPLATE/feature_request.md
-[help_wanted]: https://github.com/JuroOravec/vue-i18n-utils/labels/help%20wanted
+[issues]: https://github.com/JuroOravec/i18n-util/issues
+[issue_labels]: https://github.com/JuroOravec/i18n-util/blob/master/docs/issue_labels.md
+[issue_labels@status]: https://github.com/JuroOravec/i18n-util/blob/master/docs/issue_labels.md#status
+[svc_and_workflow]: https://github.com/JuroOravec/i18n-util/blob/master/docs/source_control_and_workflow.md
+[logging]: https://github.com/JuroOravec/i18n-util/blob/master/docs/logging.md
+[code_of_conduct]: https://github.com/JuroOravec/i18n-util/blob/master/docs/CODE_OF_CONDUCT.md
+[pull_request_template]: https://github.com/JuroOravec/i18n-util/tree/master/docs/PULL_REQUEST_TEMPLATE.md
+[feature_request_template]: https://github.com/JuroOravec/i18n-util/blob/master/docs/ISSUE_TEMPLATE/feature_request.md
+[help_wanted]: https://github.com/JuroOravec/i18n-util/labels/help%20wanted

@@ -1,4 +1,4 @@
-import fs from 'fs';
+import { promises as fsp } from 'fs';
 import { Command, CommandOptions } from 'commander';
 
 import type { Cmd } from './lib/types';
@@ -9,6 +9,7 @@ import { applyOptions } from './lib/options';
 import { applyItemOptions } from './lib/options-item';
 import { applyGeneralOptions } from './lib/options-general';
 import { applyAuxFilesOptions } from './lib/options-aux-files';
+import { pMap } from '../lib/util/array';
 
 export function createValidateCmd(program?: Cmd, options: CommandOptions = {}) {
   const createCmd = (s: string) =>
@@ -29,7 +30,7 @@ export function createValidateCmd(program?: Cmd, options: CommandOptions = {}) {
     .action(
       loadFromCli(
         { program, auxFiles: true, args: ['file'] },
-        ({
+        async ({
           i18nUtil,
           defItems,
           useItems,
@@ -44,21 +45,24 @@ export function createValidateCmd(program?: Cmd, options: CommandOptions = {}) {
           // First validate against already-existing schemas, so that if any of them
           // fails, we don't have to waste time by constructing schema by parsing
           // (possibly many) other files.
-          for (const schemaFile of schemaFiles) {
-            const schema = i18nUtil.schemator.deserialize(
-              fs.readFileSync(schemaFile, 'utf-8'),
+          await pMap(schemaFiles as string[], async (schemaFile) => {
+            const schemaContent = await fsp.readFile(schemaFile, 'utf-8');
+            const schema = await i18nUtil.schemator.deserialize(
+              schemaContent,
               unknownOpts,
             );
-            i18nUtil.validate(items, schema, unknownOpts);
-          }
+
+            await i18nUtil.validate(items, schema, unknownOpts);
+          });
 
           // Parse all provided files to generate a schema that will be used to
           // validate the items.
-          const schema = i18nUtil.schema(
+          const schema = await i18nUtil.schema(
             [...schemaDefItems, ...schemaUseItems],
             unknownOpts,
           );
-          i18nUtil.validate(items, schema, unknownOpts);
+
+          await i18nUtil.validate(items, schema, unknownOpts);
         },
       ),
     );

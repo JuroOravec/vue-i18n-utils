@@ -6,6 +6,7 @@ import type { IDefinition } from './definition/types';
 import type { ISerializerCollection } from './collection/types';
 import { ArrayMap } from './util/array-map';
 import { IContentBlock } from './content-block';
+import { pFind, pMap } from './util/array';
 
 export namespace IContentGroup {
   export interface ResolveItemsOptions {
@@ -49,18 +50,27 @@ export namespace IContentGroup {
     insert: (
       block: IContentBlock.ContentBlock,
       options: { position?: 'prepend' | 'append' },
-    ) => IContentBlock.ContentBlock;
+    ) => IContentBlock.ContentBlock | Promise<IContentBlock.ContentBlock>;
     remove: (
       block: IContentBlock.ContentBlock,
-    ) => IContentBlock.ContentBlock | undefined;
+    ) =>
+      | IContentBlock.ContentBlock
+      | undefined
+      | Promise<IContentBlock.ContentBlock | undefined>;
     resolveItems: (
       definitions: IDefinition.Item[],
       options: ResolveItemsOptions,
-    ) => {
-      matched: Map<IContentBlock.ContentBlock, IDefinition.Item[]>;
-      prepend: Map<string, IDefinition.Item[]>;
-      append: Map<string, IDefinition.Item[]>;
-    };
+    ) =>
+      | {
+          matched: Map<IContentBlock.ContentBlock, IDefinition.Item[]>;
+          prepend: Map<string, IDefinition.Item[]>;
+          append: Map<string, IDefinition.Item[]>;
+        }
+      | Promise<{
+          matched: Map<IContentBlock.ContentBlock, IDefinition.Item[]>;
+          prepend: Map<string, IDefinition.Item[]>;
+          append: Map<string, IDefinition.Item[]>;
+        }>;
   }
 
   export interface CtorOptions {
@@ -138,11 +148,11 @@ export class ContentGroup implements IContentGroup.ContentGroup {
     return block;
   }
 
-  remove(block: IContentBlock.ContentBlock) {
+  async remove(block: IContentBlock.ContentBlock) {
     const index = this.blocks.indexOf(block);
     if (index === -1) return;
     this.blocks.splice(index, 1);
-    block.remove(this);
+    await block.remove(this);
     return block;
   }
 
@@ -163,7 +173,7 @@ export class ContentGroup implements IContentGroup.ContentGroup {
    *  - `true` -  if locale / localeString / general, insert data to tag where at least one object matches the key path, else insert data to first tag that came across, else append
    *  - `'strict'` - insert data to tag where at least one object matches the key path, else append
    */
-  resolveItems(
+  async resolveItems(
     definitions: IDefinition.Item[],
     options: IContentGroup.ResolveItemsOptions = {},
   ) {
@@ -197,8 +207,10 @@ export class ContentGroup implements IContentGroup.ContentGroup {
 
     // Sort content blocks based on whether relevant (i18n) elements and
     // whether are locale-scoped or not
-    this.blocks.forEach((block, i, arr) => {
-      if (!query(block, i, arr)) return;
+    await pMap(this.blocks, async (block, i, arr) => {
+      const predicate = await query(block, i!, arr!);
+      if (!predicate) return;
+
       const { locale = localeGeneral } = block.attributes;
       blocksByLocale.push(locale, block);
     });
@@ -214,13 +226,20 @@ export class ContentGroup implements IContentGroup.ContentGroup {
 
       if (matchByIndex) {
         if (item.blockIndex !== undefined && this.blocks[item.blockIndex]) {
-          return itemsByBlocks.push(this.blocks[item.blockIndex], item);
-        } else if (matchByIndex === 'strict') {
-          return toAdd.push({ locale, item });
+          itemsByBlocks.push(this.blocks[item.blockIndex], item);
+          return;
+        }
+
+        if (matchByIndex === 'strict') {
+          toAdd.push({ locale, item });
+          return;
         }
       }
 
-      if (strategy === 'add') return toAdd.push({ locale, item });
+      if (strategy === 'add') {
+        toAdd.push({ locale, item });
+        return;
+      }
 
       const generalBlockExists = blocksByLocale.has(localeGeneral);
       const localeBlockExists =
@@ -255,6 +274,7 @@ export class ContentGroup implements IContentGroup.ContentGroup {
           : // Otherwise pass the item to those that should be resolved at
             // "general" stage
             toAdd;
+
       target.push({ locale, item });
     });
 
@@ -265,10 +285,12 @@ export class ContentGroup implements IContentGroup.ContentGroup {
     // against locale blocks to try to match against general blocks. Otherwise
     // the logic for matching locale and general blocks is the same, so we go
     // over these groups one after another.
-    for (const itemGroup of [toLocale, toGeneral]) {
-      itemGroup.forEach(({ locale, item }) => {
-        const blocksLocale = itemGroup === toLocale ? locale : localeGeneral;
+    await pMap([toLocale, toGeneral], (itemGroup) =>
+      pMap(itemGroup, async ({ locale, item }) => {
+        const blocksLocale: string =
+          itemGroup === toLocale ? locale : localeGeneral;
         const blocks = blocksByLocale.get(blocksLocale)!;
+
         let matchedBlock: IContentBlock.ContentBlock | undefined;
         let pathHash: number;
 
@@ -297,13 +319,14 @@ export class ContentGroup implements IContentGroup.ContentGroup {
               .get(pathHash)!
               .find((block) => blocks.includes(block));
           }
+
           // Otherwise we will go block by block of those that match locale,
           // and check each of them on whether it contains the path.
           else {
             // If we're searching through general blocks, we also want to
             // preferentially match a block whose content has the locale we're
-            // looking for compared to a block that doesn't, as a fallback to
-            // matching locale & path.
+            // looking for, followed by a block whose content has the path,
+            // as a fallback to matching locale & path.
             //
             // In other words:
             // Case locale block:
@@ -313,15 +336,22 @@ export class ContentGroup implements IContentGroup.ContentGroup {
             // Case general block
             //   1. try match by path & locale
             //   2. else get first found general block that has the locale
-            //   3. else get first found general block
-            let generalBlockWithLocale: IContentBlock.ContentBlock | null = null;
+            //   3. else get first found general block that has the path
+            //   4. else get first found general block
 
-            matchedBlock = blocks?.find((block) => {
-              const vContent = block.getVirtualContent();
+            let generalBlockWithLocaleIndex: number;
+            let generalBlockWithLocale: IContentBlock.ContentBlock | null = null;
+            let generalBlockWithPathIndex: number;
+            let generalBlockWithPath: IContentBlock.ContentBlock | null = null;
+
+            matchedBlock = await pFind(blocks, async (block, index) => {
+              const vContent = await block.getVirtualContent();
+
               if (vContent === undefined) return;
-              const attrs = block.attributes;
+
               // If the content of the block is NOT locale-scoped, we want to
               // add the locale to the path
+              const attrs = block.attributes;
               const path = attrs.locale
                 ? item.path
                 : [item.locale, ...item.path];
@@ -331,22 +361,50 @@ export class ContentGroup implements IContentGroup.ContentGroup {
                 // Didn't match
                 !hasPath &&
                 // And is general block
-                !attrs.locale &&
-                // And first general block with matching locale not found yet
-                !generalBlockWithLocale &&
-                // And the block's content HAS the locale as top-level path
-                get(vContent, item.locale) !== undefined
+                !attrs.locale
               ) {
-                generalBlockWithLocale = block;
+                // Search for a general block that has the locale
+                if (
+                  // If first general block with matching locale either not
+                  // found yet or we came across such block with lower index
+                  (typeof generalBlockWithLocaleIndex !== 'number' ||
+                    index! < generalBlockWithLocaleIndex) &&
+                  // And the block's content HAS the locale as top-level path
+                  get(vContent, item.locale) !== undefined
+                ) {
+                  generalBlockWithLocaleIndex = index!;
+                  generalBlockWithLocale = block;
+                }
+
+                // Search for a general block with matching path but not
+                // necessarily locale
+                if (
+                  // If first general block with matching path either not
+                  // found yet or we came across such block with lower index
+                  (typeof generalBlockWithPathIndex !== 'number' ||
+                    index! < generalBlockWithPathIndex) &&
+                  // And the block's content HAS the path under some locale
+                  Object.keys(vContent).some(
+                    (locale) =>
+                      get(vContent, [locale, ...item.path]) !== undefined,
+                  )
+                ) {
+                  generalBlockWithPathIndex = index!;
+                  generalBlockWithPath = block;
+                }
               }
+
               return hasPath;
             });
 
             if (!matchedBlock && matchByContent !== 'strict') {
-              // If we're trying to assign the item to a general block,
-              // none matched by path, but at least one contains the locale
+              // If no proper match, assign to general block with same locale
               if (itemGroup === toGeneral && generalBlockWithLocale) {
                 matchedBlock = generalBlockWithLocale;
+              }
+              // Or where any other locale has the same path
+              else if (itemGroup === toGeneral && generalBlockWithPath) {
+                matchedBlock = generalBlockWithPath;
               }
               // Otherwise try to get the first block we came across
               else if (blocks) {
@@ -382,10 +440,10 @@ export class ContentGroup implements IContentGroup.ContentGroup {
             : // If we failed to match a block while iterating general
               // blocks, we resort to adding the items
               toAdd;
+
         target.push({ locale, item });
-        return;
-      });
-    }
+      }),
+    );
 
     // At this stage, all items should be either in toAdd, or assigned to
     // a specific block in itemsByBlocks
@@ -398,7 +456,7 @@ export class ContentGroup implements IContentGroup.ContentGroup {
 
     const addGroups =
       addType === 'custom'
-        ? groupBy(toAdd, ({ item, locale }) =>
+        ? groupBy(toAdd, ({ item }) =>
             item.sourceScope === 'locale' ? item.locale : localeGeneral,
           )
         : addType === 'locale'

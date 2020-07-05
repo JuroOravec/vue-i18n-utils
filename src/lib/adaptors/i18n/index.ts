@@ -15,6 +15,7 @@ import { ItemArray, Item } from '../../item';
 import { UsageItem } from '../../usage';
 import { IContentGroup } from '../../content-group';
 import { safeWrite } from '../../util/fs';
+import { pMap } from '../../util/array';
 
 export type ExportItem<T extends I_Item.Item = I_Item.Item> = T & {
   $i18n: 'definition' | 'usage' | 'item';
@@ -76,10 +77,12 @@ export class I18nItemArray extends DefinitionArray {
           `Export items must be instances of 'Item', got ${item} instead.`,
         );
       }
+
       const itemCopy = item.copy({
         source: target,
         sourceScope: undefined,
       } as any);
+
       Object.defineProperties(itemCopy, {
         $i18n: { enumerable: true, writable: false, value: itemType },
         $data: {
@@ -96,6 +99,7 @@ export class I18nItemArray extends DefinitionArray {
           },
         },
       });
+
       return itemCopy;
     }) as T[];
   }
@@ -110,13 +114,16 @@ export class I18nItemArray extends DefinitionArray {
 
 // Do not consider file content if we are writing to an existing file
 export class I18nContentGroup extends JsonYamlContentGroup {
-  static fromFile(filepath: string, options: IContentGroup.CtorOptions = {}) {
-    return new this({ ...options, filepath, content: '' });
+  static async fromFile(
+    filepath: string,
+    options: IContentGroup.CtorOptions = {},
+  ) {
+    return new this({ ...options, filepath });
   }
 }
 
 export class I18nAdaptor extends JsonYamlAdaptor {
-  writer(
+  async writer(
     items: I_Item.Item[],
     options: IAdaptorJsonYaml.WriterOptions & { asArray?: boolean } = {},
   ) {
@@ -132,21 +139,20 @@ export class I18nAdaptor extends JsonYamlAdaptor {
     // it and export items straight out.
     if (asArray) {
       const defsByFilepaths = this._groupBySource(items as any[]);
-      safeWrite(options, (fileSys) => {
-        for (const [filepath, data] of Object.entries(defsByFilepaths)) {
+      return safeWrite(options, async (fileSys) =>
+        pMap(Object.entries(defsByFilepaths), async ([filepath, data]) => {
           const preppedData = simple ? data.map((i) => i.value) : data;
-          const serContent = this._serialize(
+          const serContent = await this._serialize(
             filepath,
             preppedData,
             parsedOptions,
           );
-          this._write(filepath, serContent, {
+          return this._write(filepath, serContent, {
             fs: fileSys as FileSystem,
             abortOnError,
           });
-        }
-      });
-      return;
+        }),
+      );
     }
 
     return super.writer(items as any, {

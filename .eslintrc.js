@@ -13,5 +13,22 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': ['warn'],
     '@typescript-eslint/ban-ts-ignore': ['warn'],
     '@typescript-eslint/no-use-before-define': ['warn'],
+    '@typescript-eslint/no-namespace': 'off',
+    '@typescript-eslint/interface-name-prefix': 'off',
+    '@typescript-eslint/camelcase': 'off',
   },
+  overrides: [
+    {
+      files: ['src/lib/i18n-util/adaptor.ts'],
+      rules: {
+        'constructor-super': 'off',
+      },
+    },
+    {
+      files: ['**/types-abstract.ts'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+  ],
 };

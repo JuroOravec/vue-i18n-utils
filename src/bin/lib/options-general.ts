@@ -22,6 +22,7 @@ export const processGeneralOptions = function processFn<
 
   const cwd = process.cwd();
   const defaultConfigPath = path.resolve(cwd, 'i18n.config.js');
+
   const configPath = configOpt
     ? path.resolve(cwd, configOpt)
     : fs.existsSync(defaultConfigPath)
@@ -46,11 +47,13 @@ export const processGeneralOptions = function processFn<
       'pathResolver',
       'valueResolver',
     ] as (keyof Config)[];
+
     // Add config's directory to searched paths
     const resolvePaths = [
       ...(require.resolve.paths('') || []),
       path.dirname(configPath),
     ];
+
     for (const prop of importableProperties) {
       const propVal = config[prop];
       if (typeof propVal !== 'string') continue;
@@ -61,7 +64,7 @@ export const processGeneralOptions = function processFn<
   return { config, unparsed };
 };
 
-export function applyGeneralOptions(cmd: Cmd) {
+export function applyGeneralOptions(cmd: Cmd): void {
   cmd
     .option('--debug', 'Print debug messages to stdout')
     .option('--verbose', 'Print cli messages to stdout')

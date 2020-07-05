@@ -25,10 +25,10 @@ export namespace IResolver {
 
   export abstract class ResolverBase implements AIResolver.Resolver {
     options = {} as object;
+
     logger = {} as (msg: string) => void;
-    resolve(inputs: any[], ...args: any[]) {
-      return inputs as any[];
-    }
+
+    resolve = {} as (inputs: any[], ...args: any[]) => any[] | Promise<any[]>;
   }
 
   /**
@@ -54,9 +54,7 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.PathResolver {
-        resolve(paths: any[], options?: ResolveOptions) {
-          return [] as string[];
-        }
+        resolve = {} as (paths: any[], options?: ResolveOptions) => string[];
       }
     }
 
@@ -81,9 +79,7 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.PathResolver {
-        resolve(paths: string[], options?: ResolveOptions) {
-          return [] as string[];
-        }
+        resolve = {} as (paths: string[], options?: ResolveOptions) => string[];
       }
     }
 
@@ -108,9 +104,10 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.PathResolver {
-        resolve(paths: string[], options?: ResolveOptions) {
-          return [] as string[];
-        }
+        resolve = {} as (
+          paths: string[],
+          options?: ResolveOptions,
+        ) => string[] | Promise<string[]>;
       }
     }
   }
@@ -135,13 +132,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.LocaleResolver {
-        resolve<T extends string>(
+        resolve = {} as <T extends string>(
           locales: T[],
-          items: (AI_Item.Item & { locale: any })[],
+          items: { locale?: any }[],
           options?: ResolveOptions,
-        ) {
-          return [] as string[];
-        }
+        ) => string[];
       }
     }
 
@@ -164,13 +159,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.LocaleResolver {
-        resolve(
+        resolve = {} as (
           locales: string[],
-          items: (AI_Item.Item & { locale: any })[],
+          items: (any & { locale?: any })[],
           options?: ResolveOptions,
-        ) {
-          return locales as string[];
-        }
+        ) => string[];
       }
     }
   }
@@ -195,13 +188,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.KeyResolver {
-        resolve<T extends string[]>(
+        resolve = {} as <T extends string[]>(
           keys: T[],
           items: (AI_Item.Item & { path: any })[],
           options?: ResolveOptions,
-        ) {
-          return keys as T[];
-        }
+        ) => T[];
       }
     }
 
@@ -228,13 +219,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.KeyResolver {
-        resolve(
+        resolve = {} as (
           keys: string[],
           items: (AI_Item.Item & { path: any })[],
           options?: ResolveOptions,
-        ) {
-          return [] as string[][];
-        }
+        ) => string[][];
       }
     }
   }
@@ -259,13 +248,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.ValueResolver {
-        resolve<T extends any>(
+        resolve = {} as <T extends any>(
           values: T[],
           items: (AI_Item.Item & { value: any })[],
           options?: ResolveOptions,
-        ) {
-          return values as T[];
-        }
+        ) => T[];
       }
     }
 
@@ -288,13 +275,11 @@ export namespace IResolver {
        */
       export abstract class Resolver extends ResolverBase
         implements AIResolver.ValueResolver {
-        resolve(
+        resolve = {} as (
           values: string[],
           items: (AI_Item.Item & { value: any })[],
           options?: ResolveOptions,
-        ) {
-          return values as string[];
-        }
+        ) => string[];
       }
     }
   }

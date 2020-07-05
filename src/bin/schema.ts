@@ -1,4 +1,4 @@
-import fs from 'fs';
+import { promises as fsp } from 'fs';
 import { Command, CommandOptions } from 'commander';
 
 import type { Cmd } from './lib/types';
@@ -26,13 +26,18 @@ export function createSchemaCmd(program?: Cmd, options: CommandOptions = {}) {
     .action(
       loadFromCli(
         { program, args: ['output'] },
-        ({ i18nUtil, defItems, useItems, opts, unknownOpts }) => {
+        async ({ i18nUtil, defItems, useItems, opts, unknownOpts }) => {
           const { output } = opts;
+
           const items = [...defItems, ...useItems];
 
-          const schema = i18nUtil.schema(items, unknownOpts);
-          const schemaSer = i18nUtil.schemator.serialize(schema, unknownOpts);
-          fs.writeFileSync(output, schemaSer);
+          const schema = await i18nUtil.schema(items, unknownOpts);
+          const schemaSer = await i18nUtil.schemator.serialize(
+            schema,
+            unknownOpts,
+          );
+
+          await fsp.writeFile(output, schemaSer);
         },
       ),
     );

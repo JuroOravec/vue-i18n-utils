@@ -7,7 +7,7 @@
  * components.
  */
 
-import type { AnyObj } from '../../types';
+import type { AnyObj, UnwrapPromise } from '../../types';
 import type {
   AIAdaptorCollection as IBaseAdaptorCollection,
   AICollection,
@@ -45,7 +45,7 @@ export namespace I_I18nUtil {
   export type Parser<T extends AnyObj = AnyObj> = (
     filepaths: string[],
     options?: T,
-  ) => DefItem[];
+  ) => DefItem[] | Promise<DefItem[]>;
 
   /**
    * Function used by I18nUtil as writer in AdaptorCollection
@@ -53,7 +53,7 @@ export namespace I_I18nUtil {
   export type Writer<T extends AnyObj = AnyObj> = (
     definitions: DefItem[],
     options?: T,
-  ) => void;
+  ) => void | Promise<void>;
 
   /**
    * Function used by I18nUtil as usageAnalyzer in AdaptorCollection
@@ -61,7 +61,7 @@ export namespace I_I18nUtil {
   export type UsageAnalyzer<T extends AnyObj = AnyObj> = (
     filepaths: string[],
     options?: T,
-  ) => UseItem[];
+  ) => UseItem[] | Promise<UseItem[]>;
 
   /**
    * Function used by I18nUtil as remover in AdaptorCollection
@@ -69,7 +69,7 @@ export namespace I_I18nUtil {
   export type Remover<T extends AnyObj = AnyObj> = (
     filepaths: string[],
     options?: T,
-  ) => void;
+  ) => void | Promise<void>;
 
   /**
    * Options object passed to I18nUtil constructor
@@ -273,10 +273,21 @@ export namespace I_I18nUtil {
     usage?: UseItemArrayLike;
   }
 
-  /**
-   * Base class with base functionalities shared among the I18nUtil classes
-   */
-  export abstract class Base implements AI_I18nUtil.Base {
+  type UsageAnalyzeReturn = {
+    usage: {
+      defined: UseItem[];
+      undefined: UseItem[];
+      missing: UseItem[];
+    };
+    definitions: {
+      used: DefItem[];
+      unused: DefItem[];
+      missing: DefItem[];
+      duplicates: Map<string, Map<string, DefItem[]>>;
+    };
+  };
+
+  abstract class AbstractBase {
     adaptors = {} as Adaptors;
     pathResolver = {} as PathResolver;
     localeResolver = {} as LocaleResolver;
@@ -286,67 +297,71 @@ export namespace I_I18nUtil {
     validator = {} as Validator;
     options = {} as AnyObj;
 
-    addAdaptor(params: Parameters<Adaptors['add']>[0]) {
-      return undefined as ReturnType<Adaptors['add']>;
-    }
+    addAdaptor = {} as (
+      params: Parameters<Adaptors['add']>[0],
+    ) => ReturnType<Adaptors['add']>;
 
-    addAdaptors(paramsList: Parameters<Adaptors['add']>[0][]) {
-      return undefined as ReturnType<Adaptors['add']>;
-    }
+    addAdaptors = {} as (
+      paramsList: Parameters<Adaptors['add']>[0][],
+    ) => ReturnType<Adaptors['add']>;
 
-    removeAdaptor(name: Parameters<Adaptors['delete']>[0]) {
-      return undefined as ReturnType<Adaptors['delete']>;
-    }
+    removeAdaptor = {} as (
+      name: Parameters<Adaptors['delete']>[0],
+    ) => ReturnType<Adaptors['delete']>;
 
-    removeAdaptors(names: Parameters<Adaptors['delete']>[0][]) {
-      return undefined as ReturnType<Adaptors['delete']>;
-    }
+    removeAdaptors = {} as (
+      names: Parameters<Adaptors['delete']>[0][],
+    ) => ReturnType<Adaptors['delete']>;
 
-    resolvePaths(paths: any[], options?: ResolvePathsOptions) {
-      return [] as string[];
-    }
-
-    resolveLocales(
-      items: I_Item.ItemArrayLike & { locale: any }[],
-      locales: any[],
-      options?: ResolveLocalesOptions,
-    ) {
-      return [] as string[];
-    }
-
-    resolveKeys(
-      items: I_Item.ItemArrayLike & { path: any }[],
-      keys: any[],
-      options?: ResolveKeysOptions,
-    ) {
-      return [] as string[][];
-    }
-
-    resolveValues(
-      items: I_Item.ItemArrayLike & { value: any }[],
-      values: any[],
-      options?: ResolveValuesOptions,
-    ) {
-      return [] as any[];
-    }
+    resolvePaths = {} as (
+      paths: any[],
+      options?: ResolvePathsOptions,
+    ) => string[] | Promise<string[]>;
   }
 
-  export abstract class LoadedBase<T extends Base = Base> extends Base
+  /**
+   * Base class with base functionalities shared among the I18nUtil classes
+   */
+  export abstract class Base extends AbstractBase implements AI_I18nUtil.Base {
+    resolveLocales = {} as (
+      items: AI_Item.ItemArrayLike,
+      locales: any[],
+      options?: ResolveLocalesOptions,
+    ) => string[] | Promise<string[]>;
+
+    resolveKeys = {} as (
+      items: AI_Item.ItemArrayLike,
+      keys: any[],
+      options?: ResolveKeysOptions,
+    ) => string[][] | Promise<string[][]>;
+
+    resolveValues = {} as (
+      items: AI_Item.ItemArrayLike,
+      values: any[],
+      options?: ResolveValuesOptions,
+    ) => any[] | Promise<any[]>;
+  }
+
+  export abstract class LoadedBase<T extends Base = Base> extends AbstractBase
     implements AI_I18nUtil.LoadedBase<T> {
     i18nUtil = {} as T;
+
     loaded = {} as DefItemArray;
 
-    resolveLocales(locales: any[], options?: ResolveLocalesOptions) {
-      return [] as ReturnType<Base['resolveLocales']>;
-    }
+    resolveLocales = {} as (
+      locales: any[],
+      options?: ResolveLocalesOptions,
+    ) => ReturnType<Base['resolveLocales']>;
 
-    resolveKeys(keys: any[], options?: ResolveKeysOptions) {
-      return [] as ReturnType<Base['resolveKeys']>;
-    }
+    resolveKeys = {} as (
+      keys: any[],
+      options?: ResolveKeysOptions,
+    ) => ReturnType<Base['resolveKeys']>;
 
-    resolveValues(values: any[], options?: ResolveValuesOptions) {
-      return [] as ReturnType<Base['resolveValues']>;
-    }
+    resolveValues = {} as (
+      values: any[],
+      options?: ResolveValuesOptions,
+    ) => ReturnType<Base['resolveValues']>;
   }
 
   /**
@@ -355,76 +370,55 @@ export namespace I_I18nUtil {
    */
   export abstract class ItemProcessor extends Base
     implements AI_I18nUtil.ItemProcessor {
-    master(items: AI_Item.ItemArrayLike, options?: MasterOptions) {
-      return [] as DefItem[];
-    }
+    master = {} as (
+      items: AI_Item.ItemArrayLike,
+      options?: MasterOptions,
+    ) => DefItem[];
 
-    locale(
+    locale = {} as (
       items: AI_Item.ItemArrayLike,
       locale: string,
       options?: LocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    locales(
+    locales = {} as (
       items: I_Item.ItemArrayLike,
       locales: string[],
       options?: LocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    toObject(items: AI_Item.ItemArrayLike, options?: ToObjectOptions) {
-      return {} as AI_Item.ToObjectResultAny;
-    }
+    toObject = {} as (
+      items: AI_Item.ItemArrayLike,
+      options?: ToObjectOptions,
+    ) => AI_Item.ToObjectResultAny;
 
-    missingItems(definitions: DefItemArrayLike, options?: MissingItemsOptions) {
-      return [] as DefItem[];
-    }
+    missingItems = {} as (
+      definitions: DefItemArrayLike,
+      options?: MissingItemsOptions,
+    ) => DefItem[];
 
-    missingLocales(
+    missingLocales = {} as (
       definitions: DefItemArrayLike,
       options?: MissingLocalesOptions,
-    ) {
-      return [] as string[];
-    }
+    ) => string[];
 
-    stats(
+    stats = {} as (
       definitions: DefItemArrayLike,
       usage: UseItemArrayLike,
       options?: I_I18nUtil.StatsOptions,
-    ) {
-      return {} as KeyStats;
-    }
+    ) => KeyStats;
 
-    usageAnalyze(
+    usageAnalyze = {} as (
       definitions: DefItemArrayLike,
       usage: UseItemArrayLike,
       options?: UsageAnalyzeOptions,
-    ) {
-      return {} as {
-        usage: {
-          defined: UseItem[];
-          undefined: UseItem[];
-          missing: UseItem[];
-        };
-        definitions: {
-          used: DefItem[];
-          unused: DefItem[];
-          missing: DefItem[];
-          duplicates: Map<string, Map<string, DefItem[]>>;
-        };
-      };
-    }
+    ) => UsageAnalyzeReturn | Promise<UsageAnalyzeReturn>;
 
-    usageValidate(
+    usageValidate = {} as (
       definitions: DefItemArrayLike,
       usage: UseItemArrayLike,
       options?: UsageValidateOptions,
-    ) {
-      return undefined as void;
-    }
+    ) => void;
   }
 
   /**
@@ -435,302 +429,311 @@ export namespace I_I18nUtil {
     implements AI_I18nUtil.LoadedItemProcessor {
     i18nUtil = {} as ItemProcessor;
 
-    master(options?: MasterOptions) {
-      return {} as ReturnType<ItemProcessor['master']>;
-    }
+    master = {} as (
+      options?: MasterOptions,
+    ) => ReturnType<ItemProcessor['master']>;
 
-    locale(locale: string, options?: LocaleOptions) {
-      return [] as ReturnType<ItemProcessor['locale']>;
-    }
+    locale = {} as (
+      locale: string,
+      options?: LocaleOptions,
+    ) => ReturnType<ItemProcessor['locale']>;
 
-    locales(locales: string[], options?: LocaleOptions) {
-      return [] as ReturnType<ItemProcessor['locales']>;
-    }
+    locales = {} as (
+      locales: string[],
+      options?: LocaleOptions,
+    ) => ReturnType<ItemProcessor['locales']>;
 
-    toObject(options?: ToObjectOptions) {
-      return {} as ReturnType<ItemProcessor['toObject']>;
-    }
+    toObject = {} as (
+      options?: ToObjectOptions,
+    ) => ReturnType<ItemProcessor['toObject']>;
 
-    missingItems(options?: MissingItemsOptions) {
-      return [] as ReturnType<ItemProcessor['missingItems']>;
-    }
+    missingItems = {} as (
+      options?: MissingItemsOptions,
+    ) => ReturnType<ItemProcessor['missingItems']>;
 
-    missingLocales(options?: MissingLocalesOptions) {
-      return [] as ReturnType<ItemProcessor['missingLocales']>;
-    }
+    missingLocales = {} as (
+      options?: MissingLocalesOptions,
+    ) => ReturnType<ItemProcessor['missingLocales']>;
 
-    stats(usage: UseItemArrayLike, options?: I_I18nUtil.StatsOptions) {
-      return {} as ReturnType<ItemProcessor['stats']>;
-    }
+    stats = {} as (
+      usage: UseItemArrayLike,
+      options?: I_I18nUtil.StatsOptions,
+    ) => ReturnType<ItemProcessor['stats']>;
 
-    usageAnalyze(usage: UseItemArrayLike, options?: UsageAnalyzeOptions) {
-      return {} as ReturnType<ItemProcessor['usageAnalyze']>;
-    }
+    usageAnalyze = {} as (
+      usage: UseItemArrayLike,
+      options?: UsageAnalyzeOptions,
+    ) => ReturnType<ItemProcessor['usageAnalyze']>;
 
-    usageValidate(usage: UseItemArrayLike, options?: UsageValidateOptions) {
-      return undefined as ReturnType<ItemProcessor['usageValidate']>;
-    }
+    usageValidate = {} as (
+      usage: UseItemArrayLike,
+      options?: UsageValidateOptions,
+    ) => ReturnType<ItemProcessor['usageValidate']>;
   }
 
   // Interface is used for merging mixin types
   export interface I18nUtil extends Base, ItemProcessor {}
+
   /**
    * Main class for working with definitions and the files where these items
    * are defined.
    */
   export abstract class I18nUtil implements AI_I18nUtil.I18nUtil {
-    definitions(paths: string[], options?: DefinitionOptions) {
-      return [] as DefItem[];
-    }
+    definitions = {} as (
+      paths: string[],
+      options?: DefinitionOptions,
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    usage(paths: string[], options?: UsageOptions) {
-      return [] as UseItem[];
-    }
+    usage = {} as (
+      paths: string[],
+      options?: UsageOptions,
+    ) => UseItem[] | Promise<UseItem[]>;
 
-    write(definitions: DefItemArrayLike, options?: WriteOptions) {
-      return undefined as void | any;
-    }
+    write = {} as (
+      definitions: DefItemArrayLike,
+      options?: WriteOptions,
+    ) => void | any | Promise<void | any>;
 
-    patch(definitions: DefItemArrayLike, options?: PatchOptions<DefItem>) {
-      return undefined as void | any;
-    }
+    patch = {} as (
+      definitions: DefItemArrayLike,
+      options?: PatchOptions<DefItem>,
+    ) => void | any | Promise<void | any>;
 
-    patchTo(definitions: DefItemArrayLike, options?: PatchOptions<DefItem>) {
-      return {} as DefinitionLoader<I18nUtil, ReturnType<I18nUtil['patch']>>;
-    }
+    patchTo = {} as (
+      definitions: DefItemArrayLike,
+      options?: PatchOptions<DefItem>,
+    ) => DefinitionLoader<I18nUtil, ReturnType<I18nUtil['patch']>>;
 
-    drop(definitions: DefItemArrayLike, options?: PatchOptions<DefItem>) {
-      return undefined as void | any;
-    }
+    drop = {} as (
+      definitions: DefItemArrayLike,
+      options?: PatchOptions<DefItem>,
+    ) => void | any;
 
-    dropFrom(definitions: DefItemArrayLike, options?: DropOptions) {
-      return {} as DefinitionLoader<I18nUtil, ReturnType<I18nUtil['drop']>>;
-    }
+    dropFrom = {} as (
+      definitions: DefItemArrayLike,
+      options?: DropOptions,
+    ) => DefinitionLoader<I18nUtil, ReturnType<I18nUtil['drop']>>;
 
-    addLocale(
+    addLocale = {} as (
       definitions: DefItemArrayLike,
       locale: string,
       options?: AddLocaleOptions<DefItem>,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    addLocales(
+    addLocales = {} as (
       definitions: DefItemArrayLike,
       locale: string[],
       options?: AddLocaleOptions<DefItem>,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    removeLocale(
+    removeLocale = {} as (
       definitions: DefItemArrayLike,
       locale: string,
       options?: RemoveLocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    removeLocales(
+    removeLocales = {} as (
       definitions: DefItemArrayLike,
       locale: string[],
       options?: RemoveLocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    clearLocale(
+    clearLocale = {} as (
       definitions: DefItemArrayLike,
       locale: string,
       options?: ClearLocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    clearLocales(
+    clearLocales = {} as (
       definitions: DefItemArrayLike,
       locale: string[],
       options?: ClearLocaleOptions,
-    ) {
-      return [] as DefItem[];
-    }
+    ) => DefItem[] | Promise<DefItem[]>;
 
-    statsAgainst(definitions: DefItemArrayLike, options?: StatsOptions) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['stats']>>;
-    }
+    statsAgainst = {} as (
+      definitions: DefItemArrayLike,
+      options?: StatsOptions,
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['stats']>>;
 
-    schema(items: AI_Item.ItemArrayLike, options?: SchemaOptions) {
-      return {} as any;
-    }
+    schema = {} as (
+      items: AI_Item.ItemArrayLike,
+      options?: SchemaOptions,
+    ) => any;
 
-    validate(
+    validate = {} as (
       items: AI_Item.ItemArrayLike,
       schema: ValidateOptions,
       options?: AnyObj,
-    ) {
-      return undefined as void;
-    }
+    ) => void;
 
-    validateAgainst(
+    validateAgainst = {} as (
       items: AI_Item.ItemArrayLike,
       options?: ValidateAgainstOptions,
-    ) {
-      return {} as Loader<I18nUtil, ReturnType<I18nUtil['validate']>>;
-    }
+    ) =>
+      | DefinitionLoader<I18nUtil, ReturnType<I18nUtil['validate']>>
+      | UsageLoader<I18nUtil, ReturnType<I18nUtil['validate']>>;
 
-    usageAnalyzeAgainst(
+    usageAnalyzeAgainst = {} as (
       definitions: DefItemArrayLike,
       options?: UsageAnalyzeOptions,
-    ) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['usageAnalyze']>>;
-    }
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['usageAnalyze']>>;
 
-    usageValidateAgainst(
+    usageValidateAgainst = {} as (
       definitions: DefItemArrayLike,
       options?: UsageValidateOptions,
-    ) {
-      return {} as UsageLoader<I18nUtil, ReturnType<I18nUtil['usageValidate']>>;
-    }
+    ) => UsageLoader<I18nUtil, ReturnType<I18nUtil['usageValidate']>>;
   }
+
   applyMixins(I18nUtil, [Base, ItemProcessor]);
 
   // Interface is used for merging mixin types
   export interface LoadedI18nUtil extends LoadedBase, LoadedItemProcessor {}
+
   /**
    * Variant of I18nUtil that stores the definitions it works with.
    */
   export abstract class LoadedI18nUtil implements AI_I18nUtil.LoadedI18nUtil {
     i18nUtil = {} as I18nUtil;
 
-    definitions(options?: DefinitionOptions) {
-      return [] as ReturnType<I18nUtil['definitions']>;
-    }
+    definitions = {} as (
+      options?: DefinitionOptions,
+    ) => ReturnType<I18nUtil['definitions']>;
 
-    usage(paths: string[], options?: UsageOptions) {
-      return [] as ReturnType<I18nUtil['usage']>;
-    }
+    usage = {} as (
+      paths: string[],
+      options?: UsageOptions,
+    ) => ReturnType<I18nUtil['usage']>;
 
-    write(options?: WriteOptions) {
-      return undefined as ReturnType<I18nUtil['write']>;
-    }
+    write = {} as (options?: WriteOptions) => ReturnType<I18nUtil['write']>;
 
-    patch(options?: PatchOptions<DefItem>) {
-      return undefined as ReturnType<I18nUtil['patch']>;
-    }
+    patch = {} as (
+      options?: PatchOptions<DefItem>,
+    ) => ReturnType<I18nUtil['patch']>;
 
-    patchTo(options?: PatchOptions<DefItem>) {
-      return {} as ReturnType<I18nUtil['patchTo']>;
-    }
+    patchTo = {} as (
+      options?: PatchOptions<DefItem>,
+    ) => ReturnType<I18nUtil['patchTo']>;
 
-    drop(options?: DropOptions) {
-      return undefined as ReturnType<I18nUtil['drop']>;
-    }
+    drop = {} as (options?: DropOptions) => ReturnType<I18nUtil['drop']>;
 
-    dropFrom(options?: DropOptions) {
-      return {} as ReturnType<I18nUtil['dropFrom']>;
-    }
+    dropFrom = {} as (
+      options?: DropOptions,
+    ) => ReturnType<I18nUtil['dropFrom']>;
 
-    addLocale(locale: string, options?: AddLocaleOptions<DefItem>) {
-      return [] as ReturnType<I18nUtil['addLocale']>;
-    }
+    addLocale = {} as (
+      locale: string,
+      options?: AddLocaleOptions<DefItem>,
+    ) => ReturnType<I18nUtil['addLocale']>;
 
-    addLocales(locale: string[], options?: AddLocaleOptions<DefItem>) {
-      return [] as ReturnType<I18nUtil['addLocales']>;
-    }
+    addLocales = {} as (
+      locale: string[],
+      options?: AddLocaleOptions<DefItem>,
+    ) => ReturnType<I18nUtil['addLocales']>;
 
-    removeLocale(locale: string, options?: RemoveLocaleOptions) {
-      return [] as ReturnType<I18nUtil['removeLocale']>;
-    }
+    removeLocale = {} as (
+      locale: string,
+      options?: RemoveLocaleOptions,
+    ) => ReturnType<I18nUtil['removeLocale']>;
 
-    removeLocales(locale: string[], options?: RemoveLocaleOptions) {
-      return [] as ReturnType<I18nUtil['removeLocales']>;
-    }
+    removeLocales = {} as (
+      locale: string[],
+      options?: RemoveLocaleOptions,
+    ) => ReturnType<I18nUtil['removeLocales']>;
 
-    clearLocale(locale: string, options?: ClearLocaleOptions) {
-      return [] as ReturnType<I18nUtil['clearLocale']>;
-    }
+    clearLocale = {} as (
+      locale: string,
+      options?: ClearLocaleOptions,
+    ) => ReturnType<I18nUtil['clearLocale']>;
 
-    clearLocales(locale: string[], options?: ClearLocaleOptions) {
-      return [] as ReturnType<I18nUtil['clearLocales']>;
-    }
+    clearLocales = {} as (
+      locale: string[],
+      options?: ClearLocaleOptions,
+    ) => ReturnType<I18nUtil['clearLocales']>;
 
-    schema(options?: SchemaOptions) {
-      return {} as any;
-    }
+    schema = {} as (options?: SchemaOptions) => any;
 
-    statsAgainst(options?: StatsOptions) {
-      return {} as ReturnType<I18nUtil['statsAgainst']>;
-    }
+    statsAgainst = {} as (
+      options?: StatsOptions,
+    ) => ReturnType<I18nUtil['statsAgainst']>;
 
-    validate(schema: AnyObj, options?: ValidateOptions) {
-      return undefined as ReturnType<I18nUtil['validate']>;
-    }
+    validate = {} as (
+      schema: AnyObj,
+      options?: ValidateOptions,
+    ) => ReturnType<I18nUtil['validate']>;
 
-    validateAgainst(options?: ValidateAgainstOptions) {
-      return {} as ReturnType<I18nUtil['validateAgainst']>;
-    }
+    validateAgainst = {} as (
+      options?: ValidateAgainstOptions,
+    ) => ReturnType<I18nUtil['validateAgainst']>;
 
-    usageAnalyzeAgainst(options?: UsageAnalyzeOptions) {
-      return {} as ReturnType<I18nUtil['usageAnalyzeAgainst']>;
-    }
+    usageAnalyzeAgainst = {} as (
+      options?: UsageAnalyzeOptions,
+    ) => ReturnType<I18nUtil['usageAnalyzeAgainst']>;
 
-    usageValidateAgainst(options?: UsageValidateOptions) {
-      return {} as ReturnType<I18nUtil['usageValidateAgainst']>;
-    }
+    usageValidateAgainst = {} as (
+      options?: UsageValidateOptions,
+    ) => ReturnType<I18nUtil['usageValidateAgainst']>;
   }
+
   applyMixins(LoadedI18nUtil, [LoadedBase, LoadedItemProcessor]);
 
-  export abstract class Loader<T extends Base = Base, R extends any = any>
-    implements AI_I18nUtil.Loader<T, R> {
+  export abstract class Loader<
+    T extends Base = Base,
+    R extends any = any,
+    I extends I_Item.Item = I_Item.Item
+  > implements AI_I18nUtil.Loader<T, R> {
     i18nUtil = {} as T;
-    callback = {} as (...args: any[]) => R;
 
-    loadFromFiles(paths: any[], options?: any) {
-      return {} as R;
-    }
+    callback = {} as (...args: any[]) => R | Promise<UnwrapPromise<R>>;
 
-    loadFromItems(items: any[]) {
-      return {} as R;
-    }
+    loadFromFiles = {} as (
+      paths: any[],
+      options?: any,
+    ) => R | Promise<UnwrapPromise<R>>;
 
-    loadFromObjects(objects: AnyObj[], options?: I_Item.FromObjectOptions) {
-      return {} as R;
-    }
+    loadFromItems = {} as (items: any[]) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromObjects = {} as (
+      objects: AnyObj[],
+      options?: I_Item.FromObjectOptions<I>,
+    ) => R | Promise<UnwrapPromise<R>>;
   }
 
   export abstract class DefinitionLoader<
     T extends Base = Base,
     R extends any = any
-  > extends Loader<T, R> implements AI_I18nUtil.DefinitionLoader<T, R> {
-    loadFromFiles(paths: any[], options?: DefinitionOptions) {
-      return {} as R;
-    }
-    loadFromItems(definitions: DefItemArrayLike) {
-      return {} as R;
-    }
-    loadFromObjects(
+  > extends Loader<T, R, DefItem>
+    implements AI_I18nUtil.DefinitionLoader<T, R> {
+    loadFromFiles = {} as (
+      paths: any[],
+      options?: DefinitionOptions,
+    ) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromItems = {} as (
+      definitions: DefItemArrayLike,
+    ) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromObjects = {} as (
       objects: AnyObj[],
       options?: I_Item.FromObjectOptions<DefItem>,
-    ) {
-      return {} as R;
-    }
+    ) => R | Promise<UnwrapPromise<R>>;
   }
 
   export abstract class UsageLoader<T extends Base = Base, R extends any = any>
-    extends Loader<T, R>
+    extends Loader<T, R, UseItem>
     implements AI_I18nUtil.UsageLoader<T, R> {
-    loadFromFiles(paths: any[], options?: UsageOptions) {
-      return {} as R;
-    }
-    loadFromItems(usage: UseItemArrayLike) {
-      return {} as R;
-    }
-    loadFromObjects(
+    loadFromFiles = {} as (
+      paths: any[],
+      options?: UsageOptions,
+    ) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromItems = {} as (
+      usage: UseItemArrayLike,
+    ) => R | Promise<UnwrapPromise<R>>;
+
+    loadFromObjects = {} as (
       objects: AnyObj[],
       options?: I_Item.FromObjectOptions<UseItem>,
-    ) {
-      return {} as R;
-    }
+    ) => R | Promise<UnwrapPromise<R>>;
   }
 
   export abstract class KeyStatsEntry implements AI_I18nUtil.KeyStatsEntry {

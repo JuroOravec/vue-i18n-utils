@@ -1,4 +1,5 @@
-const genSchema = require('generate-schema');
+// @ts-ignore
+import genSchema from 'generate-schema';
 
 import type { ISchemator } from '../types';
 import { Schemator } from '..';
@@ -13,7 +14,7 @@ describe('Schemator', () => {
     [Schemator.name, Schemator, { title: 'some', type: 'json' }],
   ];
 
-  function getExpectedJson(title: string, obj: object) {
+  function getExpectedJson(title: string, obj: object): any {
     const expected = genSchema.json(title, obj);
     delete expected['$schema'];
     return expected;
@@ -91,7 +92,7 @@ describe('Schemator', () => {
       obj: object,
       schemaType: ISchemator.SchemaType,
       title: string,
-    ) => {
+    ): any => {
       const schema = Schemator.titledTypes.includes(schemaType)
         ? genSchema[schemaType](title, obj)
         : genSchema[schemaType](obj);

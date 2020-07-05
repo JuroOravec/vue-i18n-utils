@@ -17,12 +17,11 @@ export function splitObject<T extends AnyObj, K extends string>(
 ) {
   const objWithKeys = {} as { [Key in K]: T };
   const objWithoutKeys = {} as Omit<T, K>;
+
   for (const [key, val] of Object.entries(obj)) {
     const assignee = keys.includes(key as K) ? objWithKeys : objWithoutKeys;
     (assignee as any)[key] = val;
   }
-  return [objWithKeys, objWithoutKeys] as [
-    typeof objWithKeys,
-    typeof objWithoutKeys,
-  ];
+
+  return [objWithKeys, objWithoutKeys] as const;
 }

@@ -1,9 +1,6 @@
 import type { IResolver } from './types';
 import { resolverDebug } from '../util/debug';
 
-export interface Resolver {
-  constructor: typeof Resolver;
-}
 /**
  * Base Resolver class
  */
@@ -18,8 +15,8 @@ export abstract class Resolver implements IResolver.Resolver {
     this.logger = logger || fallbackLogger;
   }
 
-  resolve(inputs: any[], ...args: any[]) {
-    return inputs as any[];
+  resolve(inputs: any[], ...args: any[]): any[] | Promise<any[]> {
+    return inputs;
   }
 
   static get defaults() {
@@ -27,4 +24,8 @@ export abstract class Resolver implements IResolver.Resolver {
       logger: resolverDebug,
     };
   }
+}
+
+export interface Resolver {
+  constructor: typeof Resolver;
 }

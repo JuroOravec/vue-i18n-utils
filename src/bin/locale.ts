@@ -36,22 +36,22 @@ export function createLocaleCmd(program?: Cmd, options: CommandOptions = {}) {
     .action(
       loadFromCli(
         { program, args: ['add', 'clear', 'remove'] },
-        ({ i18nUtil, defItems, opts, unknownOpts }) => {
+        async ({ i18nUtil, defItems, opts, unknownOpts }) => {
           const { add, clear, remove } = opts;
 
           if (add.length) {
             cliDebug(`Adding locales: ${add}`);
-            i18nUtil.addLocales(defItems, add, unknownOpts);
+            await i18nUtil.addLocales(defItems, add, unknownOpts);
           }
 
           if (clear.length) {
             cliDebug(`Clearing locales: ${clear}`);
-            i18nUtil.clearLocales(defItems, clear, unknownOpts);
+            await i18nUtil.clearLocales(defItems, clear, unknownOpts);
           }
 
           if (remove.length) {
             cliDebug(`Removing locales: ${remove}`);
-            i18nUtil.removeLocales(defItems, remove, unknownOpts);
+            await i18nUtil.removeLocales(defItems, remove, unknownOpts);
           }
         },
       ),

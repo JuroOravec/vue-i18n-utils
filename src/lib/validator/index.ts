@@ -4,8 +4,8 @@ import validateOptions from 'schema-utils';
 import type { IValidator } from './types';
 import { validatorDebug } from '../util/debug';
 
-export interface AbstractValidator {
-  constructor: typeof AbstractValidator;
+interface Defaults {
+  logger: AbstractValidator['logger'];
 }
 
 export abstract class AbstractValidator implements IValidator.Validator {
@@ -23,18 +23,24 @@ export abstract class AbstractValidator implements IValidator.Validator {
     return {} as any;
   }
 
-  static get defaults() {
+  static get defaults(): Defaults {
     return {
-      logger: validatorDebug as AbstractValidator['logger'],
+      logger: validatorDebug,
     };
   }
+}
+
+export interface AbstractValidator {
+  constructor: typeof AbstractValidator;
 }
 
 export class Validator extends AbstractValidator
   implements IValidator.Validator {
   validate(schema: any, data: any, options: IValidator.ValidateOptions = {}) {
     this.logger(`Validating schema`);
+
     validateOptions(schema, data, merge({}, this.options, options));
+
     this.logger(`Done validating schema`);
   }
 }

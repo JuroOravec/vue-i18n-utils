@@ -9,7 +9,7 @@ const originalHooks: { [key: string]: Function } = {};
 
 for (const testHook of testHookFns) {
   // @ts-ignore
-  const origHook = (global[testHook] as any) as Function;
+  const origHook = global[testHook] as Function;
   originalHooks[testHook] = origHook;
 
   const wrappedTestHookFn = (fn: Function) => {

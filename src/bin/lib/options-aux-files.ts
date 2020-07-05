@@ -3,7 +3,7 @@ import type { Cmd } from './types';
 import { processItemOptions } from './options-item';
 import { collect } from './util';
 
-export function processAuxFilesOptions<
+export async function processAuxFilesOptions<
   T extends {
     auxDefFile: string[];
     auxUsageFile: string[];
@@ -14,13 +14,18 @@ export function processAuxFilesOptions<
     auxUsageFile: auxUsageFiles,
     ...opts
   } = options;
+
   // Parse all provided files to generate a schema that will be used to
   // validate the items.
-  const { defItems, useItems, unparsed } = processItemOptions(i18nUtil, paths, {
-    ...(opts as any),
-    defFile: auxDefFiles,
-    usageFile: auxUsageFiles,
-  });
+  const { defItems, useItems, unparsed } = await processItemOptions(
+    i18nUtil,
+    paths,
+    {
+      ...(opts as any),
+      defFile: auxDefFiles,
+      usageFile: auxUsageFiles,
+    },
+  );
   return { defItems, useItems, unparsed };
 }
 
@@ -31,7 +36,7 @@ export function processAuxFilesOptions<
 export function applyAuxFilesOptions(
   cmd: Cmd,
   options: { desc?: string } = {},
-) {
+): void {
   const { desc } = options;
   const purposeMsg = desc ? ' ' + desc : '';
   cmd

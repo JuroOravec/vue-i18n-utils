@@ -8,7 +8,8 @@ import {
   fullSchemaMaster,
 } from './fixtures/schemas';
 
-export type ValidateCondData = {
+export type ValidateCond = {
+  description: string;
   definitions: IDefinition.Item[];
   validatee: any;
   options: I_I18nUtil.ValidateOptions & I_I18nUtil.SchemaOptions;
@@ -16,51 +17,42 @@ export type ValidateCondData = {
   schemaDefinitions: IDefinition.Item[];
   throws: boolean;
 };
-export type ValidateCond = [string, ValidateCondData];
 
 export const conditions: ValidateCond[] = [
-  [
-    'validates empty array as empty object',
-    {
-      definitions: [],
-      validatee: {},
-      options: {},
-      schema: emptySchema,
-      schemaDefinitions: [],
-      throws: false,
-    },
-  ],
-  [
-    'throws if validation fails (empty)',
-    {
-      definitions: [],
-      validatee: {},
-      options: {},
-      schema: fullSchemaLocale,
-      schemaDefinitions: definitions,
-      throws: true,
-    },
-  ],
-  [
-    'validates definitions (master)',
-    {
-      definitions: fullDefinitions,
-      validatee: simpleFull,
-      options: { scope: 'master' },
-      schema: fullSchemaMaster,
-      schemaDefinitions: definitions,
-      throws: false,
-    },
-  ],
-  [
-    'throws if validation fails (master)',
-    {
-      definitions: definitions,
-      validatee: simple,
-      options: { scope: 'master' },
-      schema: fullSchemaMaster,
-      schemaDefinitions: definitions,
-      throws: true,
-    },
-  ],
+  {
+    description: 'validates empty array as empty object',
+    definitions: [],
+    validatee: {},
+    options: {},
+    schema: emptySchema,
+    schemaDefinitions: [],
+    throws: false,
+  },
+  {
+    description: 'throws if validation fails (empty)',
+    definitions: [],
+    validatee: {},
+    options: {},
+    schema: fullSchemaLocale,
+    schemaDefinitions: definitions,
+    throws: true,
+  },
+  {
+    description: 'validates definitions (master)',
+    definitions: fullDefinitions,
+    validatee: simpleFull,
+    options: { scope: 'master' },
+    schema: fullSchemaMaster,
+    schemaDefinitions: definitions,
+    throws: false,
+  },
+  {
+    description: 'throws if validation fails (master)',
+    definitions: definitions,
+    validatee: simple,
+    options: { scope: 'master' },
+    schema: fullSchemaMaster,
+    schemaDefinitions: definitions,
+    throws: true,
+  },
 ];

@@ -76,7 +76,8 @@ export const instanceConditions = [
   ],
 ] as InstanceCondition[];
 
-export type ItemProcessorConditionData = {
+export type ItemProcessorCondition = {
+  description: string;
   /**
    * Definition items used in the particular test
    */
@@ -95,11 +96,14 @@ export type ItemProcessorConditionData = {
    * Expected result of `usageAnalyze` method to be used in the
    * particular test.
    */
-  analysis: ReturnType<I_I18nUtil.I18nUtil['usageAnalyze']>;
+  analysis: Exclude<
+    ReturnType<I_I18nUtil.I18nUtil['usageAnalyze']>,
+    Promise<any>
+  >;
   /**
    * Whether `usageValidate` should throw or not.
    */
-  valid: boolean;
+  throws: boolean;
   /**
    * Expected result of `stats` method to be used in the
    * particular test.
@@ -107,175 +111,129 @@ export type ItemProcessorConditionData = {
   stats: KeyStats;
 };
 
-export type ItemProcessorCondition = [string, ItemProcessorConditionData];
-
 export const conditions: ItemProcessorCondition[] = [
-  [
-    'all empty on empty usage and definitions',
-    {
-      definitions: [],
-      usage: [],
-      usageInputFiles: [],
-      analysis: {
-        definitions: {
-          missing: [],
-          unused: [],
-          used: [],
-          duplicates: new Map(),
-        },
-        usage: { defined: [], undefined: [], missing: [] },
+  {
+    description: 'all empty on empty usage and definitions',
+    definitions: [],
+    usage: [],
+    usageInputFiles: [],
+    analysis: {
+      definitions: {
+        missing: [],
+        unused: [],
+        used: [],
+        duplicates: new Map(),
       },
-      valid: true,
-      stats: {
-        locales: [],
-        usage: [],
-        definitions: [],
-        keys: [],
-        keysUnused: [],
-        keysUndefined: [],
-        keysIssues: [],
-        usageDefined: [],
-        usageUndefined: [],
-        usageMissing: [],
-        usageFiles: [],
-        definitionsUsed: [],
-        definitionsUnused: [],
-        definitionsMissing: [],
-        definitionsFiles: [],
+      usage: { defined: [], undefined: [], missing: [] },
+    },
+    throws: false,
+    stats: {
+      locales: [],
+      usage: [],
+      definitions: [],
+      keys: [],
+      keysUnused: [],
+      keysUndefined: [],
+      keysIssues: [],
+      usageDefined: [],
+      usageUndefined: [],
+      usageMissing: [],
+      usageFiles: [],
+      definitionsUsed: [],
+      definitionsUnused: [],
+      definitionsMissing: [],
+      definitionsFiles: [],
+    },
+  },
+  {
+    description: 'empty usage on empty usage',
+    definitions: definitions,
+    usage: [],
+    usageInputFiles: ['./fixtures/usage-empty.vue'].map((p) =>
+      require.resolve(p),
+    ),
+    analysis: {
+      definitions: {
+        used: [],
+        unused: definitions,
+        missing: definitionsMissing,
+        duplicates: new Map(),
+      },
+      usage: {
+        defined: [],
+        undefined: [],
+        missing: missingUsage(definitions),
       },
     },
-  ],
-  [
-    'empty usage on empty usage',
-    {
-      definitions: definitions,
+    throws: true, // unused keys
+    stats: {
+      locales: ItemArray.uniqProp(definitions, 'locale'),
       usage: [],
-      usageInputFiles: ['./fixtures/usage-empty.vue'].map((p) =>
-        require.resolve(p),
+      definitions: definitions,
+      keys: getKeys(definitions),
+      keysUnused: getKeys(definitions),
+      keysUndefined: [],
+      keysIssues: getKeys(
+        // unused
+        definitions,
       ),
-      analysis: {
-        definitions: {
-          used: [],
-          unused: definitions,
-          missing: definitionsMissing,
-          duplicates: new Map(),
-        },
-        usage: {
-          defined: [],
-          undefined: [],
-          missing: missingUsage(definitions),
-        },
-      },
-      valid: false,
-      stats: {
-        locales: ItemArray.uniqProp(definitions, 'locale'),
-        usage: [],
-        definitions: definitions,
-        keys: getKeys(definitions),
-        keysUnused: getKeys(definitions),
-        keysUndefined: [],
-        keysIssues: getKeys(
-          // unused
-          definitions,
-        ),
-        usageDefined: [],
-        usageUndefined: [],
-        usageMissing: missingUsage(definitions),
-        usageFiles: [],
-        definitionsUsed: [],
-        definitionsUnused: definitions,
-        definitionsMissing: definitionsMissing,
-        definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
-      },
+      usageDefined: [],
+      usageUndefined: [],
+      usageMissing: missingUsage(definitions),
+      usageFiles: [],
+      definitionsUsed: [],
+      definitionsUnused: definitions,
+      definitionsMissing: definitionsMissing,
+      definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
     },
-  ],
-  [
-    'empty definitions on empty definitions',
-    {
+  },
+  {
+    description: 'empty definitions on empty definitions',
+    definitions: [],
+    usage: usageNoMatch,
+    usageInputFiles: mapUniq(usageNoMatch, (i) => i.source),
+    analysis: {
+      definitions: {
+        missing: missingDefs(usageNoMatch, []),
+        unused: [],
+        used: [],
+        duplicates: new Map(),
+      },
+      usage: { defined: [], undefined: usageNoMatch, missing: [] },
+    },
+    throws: true, // undefined keys
+    stats: {
+      locales: [],
+      usage: usageNoMatch,
       definitions: [],
-      usage: usageNoMatch,
-      usageInputFiles: mapUniq(usageNoMatch, (i) => i.source),
-      analysis: {
-        definitions: {
-          missing: missingDefs(usageNoMatch, []),
-          unused: [],
-          used: [],
-          duplicates: new Map(),
-        },
-        usage: { defined: [], undefined: usageNoMatch, missing: [] },
-      },
-      valid: false,
-      stats: {
-        locales: [],
-        usage: usageNoMatch,
-        definitions: [],
-        keys: getKeys([], usageNoMatch),
-        keysUnused: [],
-        keysUndefined: getKeys([], usageNoMatch),
-        keysIssues: getKeys(
-          [],
-          // undefined
-          usageNoMatch,
-        ),
-        usageDefined: [],
-        usageUndefined: usageNoMatch,
-        usageMissing: [],
-        usageFiles: ItemArray.uniqProp(usageNoMatch, 'source'),
-        definitionsUsed: [],
-        definitionsUnused: [],
-        definitionsMissing: missingDefs(usageNoMatch, []),
-        definitionsFiles: [],
-      },
+      keys: getKeys([], usageNoMatch),
+      keysUnused: [],
+      keysUndefined: getKeys([], usageNoMatch),
+      keysIssues: getKeys(
+        [],
+        // undefined
+        usageNoMatch,
+      ),
+      usageDefined: [],
+      usageUndefined: usageNoMatch,
+      usageMissing: [],
+      usageFiles: ItemArray.uniqProp(usageNoMatch, 'source'),
+      definitionsUsed: [],
+      definitionsUnused: [],
+      definitionsMissing: missingDefs(usageNoMatch, []),
+      definitionsFiles: [],
     },
-  ],
-  [
-    'empty match on no overlap',
-    {
-      definitions: definitions,
-      usage: usageNoMatch,
-      usageInputFiles: mapUniq(usageNoMatch, (i) => i.source),
-      analysis: {
-        definitions: {
-          used: [],
-          unused: definitions,
-          missing: [
-            // missing based on usage items
-            ...missingDefs(
-              usageNoMatch,
-              ItemArray.uniqProp(definitions, 'locale'),
-            ),
-            // missing def locale variants based on def items
-            ...definitionsMissing,
-          ],
-          duplicates: new Map(),
-        },
-        usage: {
-          defined: [],
-          undefined: usageNoMatch,
-          missing: missingUsage(definitions),
-        },
-      },
-      valid: false,
-      stats: {
-        locales: ItemArray.uniqProp(definitions, 'locale'),
-        usage: usageNoMatch,
-        definitions: definitions,
-        keys: getKeys(definitions, usageNoMatch),
-        keysUnused: getKeys(definitions),
-        keysUndefined: getKeys([], usageNoMatch),
-        keysIssues: getKeys(
-          // unused
-          definitions,
-          // undefined
-          usageNoMatch,
-        ),
-        usageDefined: [],
-        usageUndefined: usageNoMatch,
-        usageMissing: missingUsage(definitions),
-        usageFiles: ItemArray.uniqProp(usageNoMatch, 'source'),
-        definitionsUsed: [],
-        definitionsUnused: definitions,
-        definitionsMissing: [
+  },
+  {
+    description: 'empty match on no overlap',
+    definitions: definitions,
+    usage: usageNoMatch,
+    usageInputFiles: mapUniq(usageNoMatch, (i) => i.source),
+    analysis: {
+      definitions: {
+        used: [],
+        unused: definitions,
+        missing: [
           // missing based on usage items
           ...missingDefs(
             usageNoMatch,
@@ -284,232 +242,253 @@ export const conditions: ItemProcessorCondition[] = [
           // missing def locale variants based on def items
           ...definitionsMissing,
         ],
-        definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
+        duplicates: new Map(),
+      },
+      usage: {
+        defined: [],
+        undefined: usageNoMatch,
+        missing: missingUsage(definitions),
       },
     },
-  ],
-  [
-    'correct items on definitions subset of usage',
-    {
+    throws: true, // undefined & unused keys
+    stats: {
+      locales: ItemArray.uniqProp(definitions, 'locale'),
+      usage: usageNoMatch,
       definitions: definitions,
-      usage: usageMatchSuperset,
-      usageInputFiles: mapUniq(usageMatchSuperset, (i) => i.source),
-      analysis: {
-        definitions: {
-          used: definitions,
-          unused: [],
-          missing: [
-            ...missingDefs(
-              usageNoMatch,
-              ItemArray.uniqProp(definitions, 'locale'),
-            ),
-            ...definitionsMissing,
-          ],
-          duplicates: new Map(),
-        },
-        usage: {
-          defined: usageMatch,
-          undefined: usageNoMatch,
-          missing: [],
-        },
-      },
-      valid: false,
-      stats: {
-        locales: ItemArray.uniqProp(definitions, 'locale'),
-        usage: usageMatchSuperset,
-        definitions: definitions,
-        keys: getKeys(definitions, usageMatchSuperset),
-        keysUnused: [],
-        keysUndefined: getKeys([], usageNoMatch),
-        keysIssues: getKeys(
-          // missing based on usage items
-          [
-            ...missingDefs(
-              usageNoMatch,
-              ItemArray.uniqProp(definitions, 'locale'),
-            ),
-            // missing def locale variants based on def items
-            ...definitionsMissing,
-          ],
-          // undefined
-          usageNoMatch,
-        ),
-        usageDefined: usageMatch,
-        usageUndefined: usageNoMatch,
-        usageMissing: [],
-        usageFiles: ItemArray.uniqProp(usageMatchSuperset, 'source'),
-        definitionsUsed: definitions,
-        definitionsUnused: [],
-        definitionsMissing: [
+      keys: getKeys(definitions, usageNoMatch),
+      keysUnused: getKeys(definitions),
+      keysUndefined: getKeys([], usageNoMatch),
+      keysIssues: getKeys(
+        // unused
+        definitions,
+        // undefined
+        usageNoMatch,
+      ),
+      usageDefined: [],
+      usageUndefined: usageNoMatch,
+      usageMissing: missingUsage(definitions),
+      usageFiles: ItemArray.uniqProp(usageNoMatch, 'source'),
+      definitionsUsed: [],
+      definitionsUnused: definitions,
+      definitionsMissing: [
+        // missing based on usage items
+        ...missingDefs(usageNoMatch, ItemArray.uniqProp(definitions, 'locale')),
+        // missing def locale variants based on def items
+        ...definitionsMissing,
+      ],
+      definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
+    },
+  },
+  {
+    description: 'correct items on definitions subset of usage',
+    definitions: definitions,
+    usage: usageMatchSuperset,
+    usageInputFiles: mapUniq(usageMatchSuperset, (i) => i.source),
+    analysis: {
+      definitions: {
+        used: definitions,
+        unused: [],
+        missing: [
           ...missingDefs(
             usageNoMatch,
             ItemArray.uniqProp(definitions, 'locale'),
           ),
           ...definitionsMissing,
         ],
-        definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
+        duplicates: new Map(),
+      },
+      usage: {
+        defined: usageMatch,
+        undefined: usageNoMatch,
+        missing: [],
       },
     },
-  ],
-  [
-    'correct items on usage subset of definitions',
-    {
+    throws: true, // undefined & missing keys
+    stats: {
+      locales: ItemArray.uniqProp(definitions, 'locale'),
+      usage: usageMatchSuperset,
       definitions: definitions,
-      usage: usageMatchSubset,
-      usageInputFiles: mapUniq(usageMatchSubset, (i) => i.source),
-      analysis: {
-        definitions: {
-          used: definitions.filter(
-            (i) => i.path[0] === 'message' && i.path[1] === 'hi',
+      keys: getKeys(definitions, usageMatchSuperset),
+      keysUnused: [],
+      keysUndefined: getKeys([], usageNoMatch),
+      keysIssues: getKeys(
+        // missing based on usage items
+        [
+          ...missingDefs(
+            usageNoMatch,
+            ItemArray.uniqProp(definitions, 'locale'),
           ),
-          unused: definitions.filter(
-            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-          ),
-          missing: [
-            ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
-            ...definitionsMissing,
-          ],
-          duplicates: new Map(),
-        },
-        usage: {
-          defined: usageMatchSubset,
-          undefined: [],
-          missing: missingUsage(
-            definitions.filter(
-              (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-            ),
-          ),
-        },
+          // missing def locale variants based on def items
+          ...definitionsMissing,
+        ],
+        // undefined
+        usageNoMatch,
+      ),
+      usageDefined: usageMatch,
+      usageUndefined: usageNoMatch,
+      usageMissing: [],
+      usageFiles: ItemArray.uniqProp(usageMatchSuperset, 'source'),
+      definitionsUsed: definitions,
+      definitionsUnused: [],
+      definitionsMissing: [
+        ...missingDefs(usageNoMatch, ItemArray.uniqProp(definitions, 'locale')),
+        ...definitionsMissing,
+      ],
+      definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
+    },
+  },
+  {
+    description: 'correct items on usage subset of definitions',
+    definitions: definitions,
+    usage: usageMatchSubset,
+    usageInputFiles: mapUniq(usageMatchSubset, (i) => i.source),
+    analysis: {
+      definitions: {
+        used: definitions.filter(
+          (i) => i.path[0] === 'message' && i.path[1] === 'hi',
+        ),
+        unused: definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+        missing: [
+          ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
+          ...definitionsMissing,
+        ],
+        duplicates: new Map(),
       },
-      valid: false,
-      stats: {
-        locales: ItemArray.uniqProp(definitions, 'locale'),
-        usage: usageMatchSubset,
-        definitions: definitions,
-        keys: getKeys(definitions, usageMatchSubset),
-        keysUnused: getKeys(
+      usage: {
+        defined: usageMatchSubset,
+        undefined: [],
+        missing: missingUsage(
           definitions.filter(
             (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
           ),
         ),
-        keysUndefined: [],
-        keysIssues: getKeys([
+      },
+    },
+    throws: true, // unused & missing keys
+    stats: {
+      locales: ItemArray.uniqProp(definitions, 'locale'),
+      usage: usageMatchSubset,
+      definitions: definitions,
+      keys: getKeys(definitions, usageMatchSubset),
+      keysUnused: getKeys(
+        definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+      ),
+      keysUndefined: [],
+      keysIssues: getKeys([
+        // unused
+        ...definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+        // missing based on usage items
+        ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
+        // missing def locale variants based on def items
+        ...definitionsMissing,
+      ]),
+      usageDefined: usageMatchSubset,
+      usageUndefined: [],
+      usageMissing: missingUsage(
+        definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+      ),
+      usageFiles: ItemArray.uniqProp(usageMatchSubset, 'source'),
+      definitionsUsed: definitions.filter(
+        (i) => i.path[0] === 'message' && i.path[1] === 'hi',
+      ),
+      definitionsUnused: definitions.filter(
+        (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+      ),
+      definitionsMissing: [
+        ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
+        ...definitionsMissing,
+      ],
+      definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
+    },
+  },
+  {
+    description: 'correct items on some overlap',
+    definitions: definitions,
+    usage: usageSomeMatch,
+    usageInputFiles: mapUniq(usageSomeMatch, (i) => i.source),
+    analysis: {
+      definitions: {
+        used: definitions.filter(
+          (i) => i.path[0] === 'message' && i.path[1] === 'hi',
+        ),
+        unused: definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+        missing: [
+          ...missingDefs(
+            usageNoMatch,
+            ItemArray.uniqProp(definitions, 'locale'),
+          ),
+          ...definitionsMissing,
+        ],
+        duplicates: new Map(),
+      },
+      usage: {
+        defined: usageMatchSubset,
+        undefined: usageNoMatch,
+        missing: missingUsage(
+          definitions.filter(
+            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+          ),
+        ),
+      },
+    },
+    throws: true, // unused & undefined & missing keys
+    stats: {
+      locales: ItemArray.uniqProp(definitions, 'locale'),
+      usage: usageSomeMatch,
+      definitions: definitions,
+      keys: getKeys(definitions, usageSomeMatch),
+      keysUnused: getKeys(
+        definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+      ),
+      keysUndefined: getKeys([], usageNoMatch),
+      keysIssues: getKeys(
+        [
           // unused
           ...definitions.filter(
             (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
           ),
           // missing based on usage items
-          ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
-          // missing def locale variants based on def items
-          ...definitionsMissing,
-        ]),
-        usageDefined: usageMatchSubset,
-        usageUndefined: [],
-        usageMissing: missingUsage(
-          definitions.filter(
-            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-          ),
-        ),
-        usageFiles: ItemArray.uniqProp(usageMatchSubset, 'source'),
-        definitionsUsed: definitions.filter(
-          (i) => i.path[0] === 'message' && i.path[1] === 'hi',
-        ),
-        definitionsUnused: definitions.filter(
-          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-        ),
-        definitionsMissing: [
-          ...missingDefs([], ItemArray.uniqProp(definitions, 'locale')),
-          ...definitionsMissing,
-        ],
-        definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
-      },
-    },
-  ],
-  [
-    'correct items on some overlap',
-    {
-      definitions: definitions,
-      usage: usageSomeMatch,
-      usageInputFiles: mapUniq(usageSomeMatch, (i) => i.source),
-      analysis: {
-        definitions: {
-          used: definitions.filter(
-            (i) => i.path[0] === 'message' && i.path[1] === 'hi',
-          ),
-          unused: definitions.filter(
-            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-          ),
-          missing: [
-            ...missingDefs(
-              usageNoMatch,
-              ItemArray.uniqProp(definitions, 'locale'),
-            ),
-            ...definitionsMissing,
-          ],
-          duplicates: new Map(),
-        },
-        usage: {
-          defined: usageMatchSubset,
-          undefined: usageNoMatch,
-          missing: missingUsage(
-            definitions.filter(
-              (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-            ),
-          ),
-        },
-      },
-      valid: false,
-      stats: {
-        locales: ItemArray.uniqProp(definitions, 'locale'),
-        usage: usageSomeMatch,
-        definitions: definitions,
-        keys: getKeys(definitions, usageSomeMatch),
-        keysUnused: getKeys(
-          definitions.filter(
-            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-          ),
-        ),
-        keysUndefined: getKeys([], usageNoMatch),
-        keysIssues: getKeys(
-          [
-            // unused
-            ...definitions.filter(
-              (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-            ),
-            // missing based on usage items
-            ...missingDefs(
-              usageNoMatch,
-              ItemArray.uniqProp(definitions, 'locale'),
-            ),
-            // missing def locale variants based on def items
-            ...definitionsMissing,
-          ],
-          // undefined
-          usageNoMatch,
-        ),
-        usageDefined: usageMatchSubset,
-        usageUndefined: usageNoMatch,
-        usageMissing: missingUsage(
-          definitions.filter(
-            (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-          ),
-        ),
-        usageFiles: ItemArray.uniqProp(usageSomeMatch, 'source'),
-        definitionsUsed: definitions.filter(
-          (i) => i.path[0] === 'message' && i.path[1] === 'hi',
-        ),
-        definitionsUnused: definitions.filter(
-          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
-        ),
-        definitionsMissing: [
           ...missingDefs(
             usageNoMatch,
             ItemArray.uniqProp(definitions, 'locale'),
           ),
+          // missing def locale variants based on def items
           ...definitionsMissing,
         ],
-        definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
-      },
+        // undefined
+        usageNoMatch,
+      ),
+      usageDefined: usageMatchSubset,
+      usageUndefined: usageNoMatch,
+      usageMissing: missingUsage(
+        definitions.filter(
+          (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+        ),
+      ),
+      usageFiles: ItemArray.uniqProp(usageSomeMatch, 'source'),
+      definitionsUsed: definitions.filter(
+        (i) => i.path[0] === 'message' && i.path[1] === 'hi',
+      ),
+      definitionsUnused: definitions.filter(
+        (i) => !(i.path[0] === 'message' && i.path[1] === 'hi'),
+      ),
+      definitionsMissing: [
+        ...missingDefs(usageNoMatch, ItemArray.uniqProp(definitions, 'locale')),
+        ...definitionsMissing,
+      ],
+      definitionsFiles: ItemArray.uniqProp(definitions, 'source'),
     },
-  ],
+  },
 ];

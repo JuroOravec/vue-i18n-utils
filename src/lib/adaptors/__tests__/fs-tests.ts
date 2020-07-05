@@ -1,13 +1,16 @@
-import fs from 'fs';
+import fs, { promises as fsp } from 'fs';
 import path from 'path';
-import { fileSync, FileResult, FileOptions } from 'tmp';
+import { FileResult, FileOptions } from 'tmp';
 
+import type { AnyObj } from '../../../types';
 import type { I_Item } from '../../item/types';
 import type { I_I18nUtil } from '../../i18n-util/types';
 import { writeFileSpies, unlinkSpies, relPath } from './helpers';
-import { AnyObj } from '../../../types';
+import { file } from '../../util/p-tmp';
+import { pMap } from '../../util/array';
 
-export interface FsConditionData {
+export interface FsCondition {
+  description: string;
   /**
    * Tuple of expected file modifications - [pathToFile, pathToExpectedResult]
    */
@@ -59,7 +62,7 @@ export function testFS({
     inst: I_I18nUtil.AdaptorCollection.ItemMethods,
     ...args: Partial<[any, any]>
   ) => any;
-  condition: FsConditionData;
+  condition: Omit<FsCondition, 'description'>;
 }) {
   const {
     fileChanges = [],
@@ -68,6 +71,7 @@ export function testFS({
     options = {},
     meta = {},
   } = condition;
+
   const {
     writes,
     removes,
@@ -81,18 +85,20 @@ export function testFS({
   const tempFileMapping = new Map<string, FileResult>();
   const createdFiles = new Set<string>();
 
-  beforeAll(() => {
+  beforeAll(async () => {
     tempToExpectFile.clear();
     tempFileMapping.clear();
     createdFiles.clear();
 
     // Replace the source files with temp files with same content, so we
     // can observe the changes on the temp files.
-    fileChanges.forEach(([filepath, expect]) => {
-      const tempFile = fileSync(meta);
+    await pMap(fileChanges, async ([filepath, expect]) => {
+      const tempFile = await file(meta);
+
       tempFileMapping.set(filepath, tempFile);
       tempToExpectFile.set(tempFile.name, expect);
-      fs.writeFileSync(tempFile.name, fs.readFileSync(filepath));
+
+      await fsp.writeFile(tempFile.name, await fsp.readFile(filepath));
     });
 
     // Copy the linked definitions (files linked in i18n elems via 'src'
@@ -101,26 +107,31 @@ export function testFS({
     const uniqTempDirs = new Set(
       Array.from(tempToExpectFile.keys(), path.dirname),
     );
-    for (const tempDir of uniqTempDirs) {
-      linkedFiles.forEach((file) => {
+
+    await pMap([...uniqTempDirs], (tempDir) =>
+      pMap(linkedFiles, async (file) => {
         const src = relPath(file, { base: cwd ?? module.filename });
         const dest = path.join(tempDir, path.basename(src));
-        fs.writeFileSync(dest, fs.readFileSync(src));
+
+        await fsp.writeFile(dest, await fsp.readFile(src));
+
         createdFiles.add(dest);
-      });
-    }
+      }),
+    );
 
     // Make temp copies of source files (or remember the files if testing
     // file creation anew).
     const tempFileDefs = data.map((item) => {
       const origSrc = item.source!;
       let source: string;
+
       if (!tempFileMapping.has(origSrc)) {
         createdFiles.add(origSrc);
         source = origSrc;
       } else {
         source = tempFileMapping.get(origSrc)!.name;
       }
+
       return item.copy({ source });
     });
 
@@ -129,19 +140,20 @@ export function testFS({
     unlinkSpies.reset();
 
     const action = () => method(instance, tempFileDefs, options);
+
     // Do the biz
-    if (throws) expect(action).toThrow();
-    else action();
+    await (throws ? expect(action).rejects.toThrow() : action());
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Remove the temp files
     for (const tempFile of tempFileMapping.values()) {
       tempFile.removeCallback();
     }
-    for (const file of createdFiles) {
-      if (fs.existsSync(file)) fs.unlinkSync(file);
-    }
+
+    await pMap([...createdFiles], (f) =>
+      fs.existsSync(f) ? fsp.unlink(f) : undefined,
+    );
   });
 
   const expectedWrites = writes ?? data.length;
@@ -175,30 +187,32 @@ export function testFS({
     });
   }
 
-  test('file contents are as expected', () => {
-    for (const [tempFile, expectFile] of tempToExpectFile) {
-      if (expectFile) {
-        const tempFileContent = fs.readFileSync(tempFile, 'utf-8').trim();
-        const expectFileContent = fs.readFileSync(expectFile, 'utf-8').trim();
-        expect(tempFileContent).toBe(expectFileContent);
-      } else {
+  test('file contents are as expected', async () => {
+    await pMap([...tempToExpectFile], async ([tempFile, expectFile]) => {
+      if (!expectFile) {
         expect(fs.existsSync(tempFile)).toBe(false);
+        return;
       }
-    }
+
+      const tempFileContent = await fsp.readFile(tempFile, 'utf-8');
+      const expectFileContent = await fsp.readFile(expectFile, 'utf-8');
+
+      expect(tempFileContent.trim()).toBe(expectFileContent.trim());
+    });
   });
 
-  test('linked file contents are as expected', () => {
-    for (const [file, linkedToExpected] of linkedShouldExist || []) {
+  test('linked file contents are as expected', async () => {
+    await pMap(linkedShouldExist || [], async ([file, linkedToExpected]) => {
       const tempDir = path.dirname(tempFileMapping.get(file)!.name);
 
-      for (const [linkedRelPath, expectFile] of linkedToExpected) {
+      return pMap(linkedToExpected, async ([linkedRelPath, expectFile]) => {
         const linkedFile = path.resolve(tempDir, linkedRelPath);
-        const linkedFileContent = fs.readFileSync(linkedFile, 'utf-8').trim();
-        const expectFileContent = fs.readFileSync(expectFile, 'utf-8').trim();
+        const linkedFileContent = await fsp.readFile(linkedFile, 'utf-8');
+        const expectFileContent = await fsp.readFile(expectFile, 'utf-8');
 
-        expect(linkedFileContent).toBe(expectFileContent);
-      }
-    }
+        expect(linkedFileContent.trim()).toBe(expectFileContent.trim());
+      });
+    });
   });
 
   test('linked file are removed as expected', () => {
@@ -213,6 +227,7 @@ export function testFS({
         if (!createdFiles.has(linkedPath)) {
           fail(`File is not part of the test: '${linkedPath}'`);
         }
+
         expect(fs.existsSync(linkedPath)).toBeFalsy();
       }
     }

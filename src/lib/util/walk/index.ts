@@ -24,11 +24,13 @@ export function createObjectPath<T extends DeepObject>(
   obj: T,
   path: IPath,
   options: { overwrite?: boolean } = {},
-) {
+): DeepObject {
   const { overwrite = false } = options;
   return path.reduce((ancestor, key, i) => {
-    if (!ancestor.hasOwnProperty(key)) ancestor[key] = {};
+    if (!Object.hasOwnProperty.call(ancestor, key)) ancestor[key] = {};
+
     const argIsObject = isObject(ancestor[key]);
+
     if (!argIsObject) {
       if (!overwrite) {
         throw Error(
@@ -69,20 +71,24 @@ export function deepWalk<
     args?: A;
   },
   obj: object,
-) {
+): void {
   const {
     onBranch,
     onLeaf,
     args = {},
     isBranch = ({ value }) => isObject(value),
   } = params;
+
   if (!(obj && isObject(obj))) {
     throw Error(`deepWalkLeaf expects an object, got ${typeof obj} instead`);
   }
+
   const initialPath: IPath = [];
   const walkQueue: IQueueItem[] = [[obj, initialPath]];
+
   while (walkQueue.length) {
     const [currObj, currPath] = walkQueue.pop() as IQueueItem;
+
     Object.entries(currObj).forEach(([key, value]) => {
       const currArgs = {
         key,
@@ -90,6 +96,7 @@ export function deepWalk<
         path: currPath,
         ...args,
       } as IDeepWalkHookOptions<A>;
+
       if (isBranch(currArgs)) {
         // Use value from branch fn if it is provided and if it returns
         // sth other than undefined.
@@ -97,6 +104,7 @@ export function deepWalk<
         walkQueue.push([currVal, [...currPath, key]]);
         return;
       }
+
       if (onLeaf) onLeaf(currArgs);
     });
   }
@@ -198,5 +206,6 @@ export function mergeDeepWith<T extends DeepObject>(
       obj,
     );
   });
+
   return { value: result, origin };
 }

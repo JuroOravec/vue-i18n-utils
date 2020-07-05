@@ -53,6 +53,7 @@ describe('I18nUtilBase', () => {
         },
       ];
       utilBase.addAdaptors(adaptors);
+
       adaptors.map(({ name, methods }) => {
         const adaptor = utilBase.adaptors.get(name);
         expect(adaptor!).toBeDefined();
@@ -118,18 +119,18 @@ describe('I18nUtilBase', () => {
       });
     });
 
-    test('resolvePaths (empty)', () => {
+    test('resolvePaths (empty)', async () => {
       const utilBase = new klass();
-      const resolved = utilBase.resolvePaths([]);
+      const resolved = await utilBase.resolvePaths([]);
 
       expect(resolved).toBeDefined();
       expect(Array.isArray(resolved)).toBeTruthy();
       expect(resolved).toHaveLength(0);
     });
 
-    test('resolvePaths', () => {
+    test('resolvePaths', async () => {
       const utilBase = new klass();
-      const resolved = utilBase.resolvePaths([
+      const resolved = await utilBase.resolvePaths([
         'src/lib/i18n-util/__tests__/fixtures/**',
       ]);
 

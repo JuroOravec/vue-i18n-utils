@@ -28,20 +28,20 @@ export namespace IContentBlock {
     /**
      * Set single attribute.
      */
-    setAttribute(key: string, value: string): void;
+    setAttribute(key: string, value: string): void | Promise<void>;
     /**
      * Remove single attribute.
      */
-    removeAttribute(key: string): void;
+    removeAttribute(key: string): void | Promise<void>;
     /**
      * Get loaded representation of the content stored by the instance, or
      * initialize it if doesn't exist yet.
      */
-    getVirtualContent(): any;
+    getVirtualContent(): any | Promise<any>;
     /**
      * Remove the block from a group
      */
-    remove(group: ContentGroup): void;
+    remove(group: ContentGroup): void | Promise<void>;
     /**
      * Serializes a list of DefinitionItems into a string based on the the block's
      * attributes.
@@ -49,7 +49,7 @@ export namespace IContentBlock {
     serializeItems(
       definitions: IDefinition.Item[],
       opts?: I_Item.ItemsByLocaleOptions,
-    ): string;
+    ): string | Promise<string>;
   }
 
   export interface CtorOptions {

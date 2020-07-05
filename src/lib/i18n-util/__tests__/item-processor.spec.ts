@@ -1,6 +1,7 @@
 import type { IDefinition } from '../../definition/types';
 
 import type { I_I18nUtil } from '../types';
+import toParams from '../../../../test/util/to-params';
 import { I18nUtil, LoadedI18nUtil } from '..';
 import {
   definitions as inputDefs,
@@ -15,7 +16,10 @@ import {
 } from './fixtures/definition-objects';
 import { mapUniq } from '../../util/array';
 import { LoadedBase } from '../base';
-import { conditions, instanceConditions } from './item-processor-conds';
+import {
+  conditions as itemProcessorConditions,
+  instanceConditions,
+} from './item-processor-conds';
 import {
   testUsageAnalyze,
   testUsageValidate,
@@ -25,6 +29,8 @@ import { validateItems } from './item-processor-helpers';
 import { DefinitionArray } from '../../definition';
 
 type DefItem = IDefinition.Item;
+
+const itemProcessorParams = toParams(itemProcessorConditions);
 
 describe('I18nUtilItemProcessor', () => {
   describe.each(instanceConditions)('%s', (name, klass, setup) => {
@@ -40,46 +46,56 @@ describe('I18nUtilItemProcessor', () => {
       }
     });
 
-    describe.each([
-      [
-        'master',
-        null,
-        (i18nUtil: any, ...args: any[]) => i18nUtil.master(...args),
-        (arr: any[], opts: any) => arr,
-        validateItems,
-      ],
-      [
-        'locale',
-        'de',
-        (i18nUtil: any, ...args: any[]) => i18nUtil.locale(...args),
-        (arr: DefItem[], opts: any) =>
-          arr.filter((item) => item.locale === 'de'),
-        validateItems,
-      ],
-      [
-        'locales',
-        ['en', 'de'],
-        (i18nUtil: any, ...args: any[]) => i18nUtil.locales(...args),
-        (arr: DefItem[], opts: any) =>
+    const commonMethodsConditions: {
+      description: string;
+      locale: string | string[] | null;
+      method: (...args: any) => any;
+      transformer: (items: DefItem[], opts: any) => any[];
+      validator: (res: any[], exp: any[]) => void;
+    }[] = [
+      {
+        description: 'master',
+        locale: null,
+        method: (i18nUtil: I18nUtil, ...args: [any]) =>
+          i18nUtil.master(...args),
+        transformer: (arr) => arr,
+        validator: validateItems,
+      },
+      {
+        description: 'locale',
+        locale: 'de',
+        method: (i18nUtil: I18nUtil, ...args: [any, any]) =>
+          i18nUtil.locale(...args),
+        transformer: (arr) => arr.filter((item) => item.locale === 'de'),
+        validator: validateItems,
+      },
+      {
+        description: 'locales',
+        locale: ['en', 'de'],
+        method: (i18nUtil: I18nUtil, ...args: [any, any]) =>
+          i18nUtil.locales(...args),
+        transformer: (arr) =>
           arr.filter((item) => ['en', 'de'].includes(item.locale)),
-        validateItems,
-      ],
-      [
-        'missingItems',
-        null,
-        (i18nUtil: any, ...args: any[]) => i18nUtil.missingItems(...args),
-        (arr: DefItem[], opts: any) =>
+        validator: validateItems,
+      },
+      {
+        description: 'missingItems',
+        locale: null,
+        method: (i18nUtil: I18nUtil, ...args: [any, any]) =>
+          i18nUtil.missingItems(...args),
+        transformer: (arr, opts) =>
           DefinitionArray.filterMissing(
             opts.includeMissing ? arr : [...inputDefs, ...definitionsMissing],
             opts,
           ).items,
-        validateItems,
-      ],
-      [
-        'missingLocales',
-        null,
-        (i18nUtil: any, ...args: any[]) => i18nUtil.missingLocales(...args),
-        (arr: DefItem[], opts: any) =>
+        validator: validateItems,
+      },
+      {
+        description: 'missingLocales',
+        locale: null,
+        method: (i18nUtil: I18nUtil, ...args: [any]) =>
+          i18nUtil.missingLocales(...args),
+        transformer: (arr, opts: any) =>
           mapUniq(
             DefinitionArray.filterMissing(
               opts.includeMissing ? arr : [...inputDefs, ...definitionsMissing],
@@ -87,68 +103,86 @@ describe('I18nUtilItemProcessor', () => {
             ).items,
             (item) => item.locale,
           ),
-        (result: string[], expected: string[]) => {
+        validator: (result: string[], expected: string[]) => {
           expect(result).toBeDefined();
           expect(Array.isArray(result)).toBeTruthy();
-          expect(result.every((l) => typeof l === 'string')).toBeTruthy();
           expect(result).toHaveLength(expected.length);
+          expect(result.every((l) => typeof l === 'string')).toBeTruthy();
           result.every((l) => expected.includes(l));
         },
-      ],
-    ] as [string, string | string[] | null, (...args: any) => any, (items: DefItem[], opts: any) => DefItem[], (res: any[], exp: any[]) => void][])(
+      },
+    ];
+
+    describe.each(toParams(commonMethodsConditions))(
       '%s',
-      (methodName, locale, method, transformer, validator) => {
-        test('returns empty array on empty array', () => {
+      (desc, { locale, method, transformer, validator }) => {
+        test('returns empty array on empty array', async () => {
           const defs = [] as DefItem[];
+
           if (i18nUtil instanceof LoadedBase) {
             i18nUtil.loaded.items = [...defs];
           }
-          const res =
-            i18nUtil instanceof LoadedBase
-              ? locale
-                ? method(i18nUtil, locale)
-                : method(i18nUtil)
-              : locale
-              ? method(i18nUtil, defs, locale)
-              : method(i18nUtil, defs);
+
+          const res = await (i18nUtil instanceof LoadedBase
+            ? locale
+              ? method(i18nUtil, locale)
+              : method(i18nUtil)
+            : locale
+            ? method(i18nUtil, defs, locale)
+            : method(i18nUtil, defs));
 
           expect(res).toEqual([]);
         });
 
         describe('returns entries of definitions with matching locale', () => {
-          test.each([
-            [
-              'includeMissing=true',
-              { includeMissing: true },
-              [...inputDefs, ...definitionsMissing],
-            ],
-            ['includeMissing=false', { includeMissing: false }, inputDefs],
-            ['includeMissing=default', {}, inputDefs],
-            [
-              'includeMissing=true missingValue=""',
-              { includeMissing: true, missingValue: '' },
-              [
+          const conditions: {
+            description: string;
+            options?: any;
+            expected?: DefItem[];
+          }[] = [
+            {
+              description: 'includeMissing=true',
+              options: { includeMissing: true },
+              expected: [...inputDefs, ...definitionsMissing],
+            },
+            {
+              description: 'includeMissing=false',
+              options: { includeMissing: false },
+              expected: inputDefs,
+            },
+            {
+              description: 'includeMissing=default',
+              expected: inputDefs,
+            },
+            {
+              description: 'includeMissing=true missingValue=""',
+              options: { includeMissing: true, missingValue: '' },
+              expected: [
                 ...inputDefs,
                 ...definitionsMissing.map((item) => item.copy({ value: '' })),
               ],
-            ],
-            [
-              'includeMissing=true missingValue=default',
-              { includeMissing: true },
-              [...inputDefs, ...definitionsMissing],
-            ],
-          ] as [string, any, DefItem[]][])('%s', (desc, opts, expected) => {
-            const res =
-              i18nUtil instanceof LoadedBase
-                ? locale
-                  ? method(i18nUtil, locale, opts)
-                  : method(i18nUtil, opts)
-                : locale
-                ? method(i18nUtil, inputDefs, locale, opts)
-                : method(i18nUtil, inputDefs, opts);
+            },
+            {
+              description: 'includeMissing=true missingValue=default',
+              options: { includeMissing: true },
+              expected: [...inputDefs, ...definitionsMissing],
+            },
+          ];
 
-            validator(res, transformer(expected, opts));
-          });
+          test.each(toParams(conditions))(
+            '%s',
+            async (desc, { options = {}, expected = [] }) => {
+              const res = await (i18nUtil instanceof LoadedBase
+                ? locale
+                  ? method(i18nUtil, locale, options)
+                  : method(i18nUtil, options)
+                : locale
+                ? method(i18nUtil, inputDefs, locale, options)
+                : method(i18nUtil, inputDefs, options));
+
+              validator(res, transformer(expected, options));
+            },
+          );
         });
       },
     );
@@ -156,9 +190,11 @@ describe('I18nUtilItemProcessor', () => {
     describe('toObject', () => {
       test('returns empty object on empty array', () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedBase) {
           i18nUtil.loaded.items = [...defs];
         }
+
         const res =
           i18nUtil instanceof LoadedBase
             ? i18nUtil.toObject()
@@ -168,51 +204,83 @@ describe('I18nUtilItemProcessor', () => {
       });
 
       describe('returns object composed of all definitions on definitions array', () => {
-        test.each([
-          ['simple=true', { simple: true }, simple],
-          ['simple=false', { simple: false }, expanded],
-          ['simple=default', {}, expanded],
-          ['merge=true', { merge: true }, expandedMerged],
-          ['merge=false', { merge: false }, expanded],
-          ['merge=default', {}, expanded],
-          [
-            'simple=true merge=true',
-            { simple: true, merge: true },
-            simpleMerged,
-          ],
-          [
-            'includeMissing=true',
-            { simple: true, includeMissing: true },
-            simpleMissing,
-          ],
-          [
-            'includeMissing=false',
-            { simple: true, includeMissing: false },
-            simple,
-          ],
-          [
-            'includeMissing=default',
-            { simple: true, includeMissing: false },
-            simple,
-          ],
-        ])('%s', (desc, opts, expected) => {
-          const defs = [...inputDefs, ...definitionsMissing] as DefItem[];
-          if (i18nUtil instanceof LoadedBase) {
-            i18nUtil.loaded.items = [...defs];
-          }
-          const res =
-            i18nUtil instanceof LoadedBase
-              ? i18nUtil.toObject(opts)
-              : i18nUtil.toObject([...defs], opts);
+        const conditions: {
+          description: string;
+          options?: any;
+          expected?: object;
+        }[] = [
+          {
+            description: 'simple=true',
+            options: { simple: true },
+            expected: simple,
+          },
+          {
+            description: 'simple=false',
+            options: { simple: false },
+            expected: expanded,
+          },
+          {
+            description: 'simple=default',
+            expected: expanded,
+          },
+          {
+            description: 'merge=true',
+            options: { merge: true },
+            expected: expandedMerged,
+          },
+          {
+            description: 'merge=false',
+            options: { merge: false },
+            expected: expanded,
+          },
+          {
+            description: 'merge=default',
+            expected: expanded,
+          },
+          {
+            description: 'simple=true merge=true',
+            options: { simple: true, merge: true },
+            expected: simpleMerged,
+          },
+          {
+            description: 'includeMissing=true',
+            options: { simple: true, includeMissing: true },
+            expected: simpleMissing,
+          },
+          {
+            description: 'includeMissing=false',
+            options: { simple: true, includeMissing: false },
+            expected: simple,
+          },
+          {
+            description: 'includeMissing=default',
+            options: { simple: true, includeMissing: false },
+            expected: simple,
+          },
+        ];
 
-          expect(res).toEqual(expected);
-        });
+        test.each(toParams(conditions))(
+          '%s',
+          (desc, { options = {}, expected = [] }) => {
+            const defs = [...inputDefs, ...definitionsMissing] as DefItem[];
+            if (i18nUtil instanceof LoadedBase) {
+              i18nUtil.loaded.items = [...defs];
+            }
+            const res =
+              i18nUtil instanceof LoadedBase
+                ? i18nUtil.toObject(options)
+                : i18nUtil.toObject([...defs], options);
+
+            expect(res).toEqual(expected);
+          },
+        );
       });
     });
 
     describe('usageAnalyze', () => {
-      describe.each(conditions)('returns [%s]', (desc, cond) => {
+      describe.each(itemProcessorParams)('returns [%s]', (desc, cond) => {
         const { definitions, usage, analysis } = cond;
+
         const fn: {
           call: () => ReturnType<I_I18nUtil.I18nUtil['usageAnalyze']>;
         } = {} as any;
@@ -221,6 +289,7 @@ describe('I18nUtilItemProcessor', () => {
           if (i18nUtil instanceof LoadedBase) {
             i18nUtil.loaded.items = [...definitions];
           }
+
           fn.call = () =>
             i18nUtil instanceof LoadedBase
               ? i18nUtil.usageAnalyze(usage)
@@ -232,8 +301,9 @@ describe('I18nUtilItemProcessor', () => {
     });
 
     describe('usageValidate', () => {
-      describe.each(conditions)('returns [%s]', (desc, cond) => {
-        const { definitions, usage, valid } = cond;
+      describe.each(itemProcessorParams)('returns [%s]', (desc, cond) => {
+        const { definitions, usage, throws } = cond;
+
         const fn: {
           call: () => ReturnType<I_I18nUtil.I18nUtil['usageValidate']>;
         } = {} as any;
@@ -242,18 +312,19 @@ describe('I18nUtilItemProcessor', () => {
           if (i18nUtil instanceof LoadedBase) {
             i18nUtil.loaded.items = [...definitions];
           }
+
           fn.call = () =>
             i18nUtil instanceof LoadedBase
               ? i18nUtil.usageValidate(usage)
               : i18nUtil.usageValidate(definitions, usage);
         });
 
-        testUsageValidate(fn, valid);
+        testUsageValidate(fn, throws);
       });
     });
 
     describe('stats', () => {
-      describe.each(conditions)(
+      describe.each(itemProcessorParams)(
         'returns [%s]',
         (desc, { definitions, usage, stats }) => {
           const fn: {
@@ -264,11 +335,13 @@ describe('I18nUtilItemProcessor', () => {
             if (i18nUtil instanceof LoadedBase) {
               i18nUtil.loaded.items = [...definitions];
             }
+
             fn.call = () =>
               i18nUtil instanceof LoadedBase
                 ? i18nUtil.stats(usage)
                 : i18nUtil.stats(definitions, usage);
           });
+
           testStats(fn, stats);
         },
       );

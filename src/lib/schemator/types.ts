@@ -48,15 +48,16 @@ export namespace ISchemator {
 
   export abstract class Schemator implements AISchemator.Schemator {
     options = {} as AnyObj;
+
     logger = {} as (msg: string) => void;
-    generate(data: any, options?: GenerateOptions) {
-      return {} as any;
-    }
-    serialize(schema: any, options?: SerializeOptions) {
-      return '' as string | Buffer;
-    }
-    deserialize(schema: string, options?: DeserializeOptions) {
-      return {} as any;
-    }
+
+    generate = {} as (data: any, options?: GenerateOptions) => any;
+
+    serialize = {} as (
+      schema: any,
+      options?: SerializeOptions,
+    ) => string | Buffer;
+
+    deserialize = {} as (schema: string, options?: DeserializeOptions) => any;
   }
 }

@@ -63,35 +63,35 @@ parametrizeInstance(
       const globs = ['src/lib/i18n-util/__tests__/fixtures/*.{vue,json}'];
       const paths = flatten(globs.map((p) => globSync(p)));
 
-      test('returns empty on empty array', () => {
+      test('returns empty on empty array', async () => {
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [];
         }
 
-        const definitions =
-          i18nUtil instanceof LoadedI18nUtil
-            ? i18nUtil.definitions()
-            : i18nUtil.definitions([]);
+        const definitions = await (i18nUtil instanceof LoadedI18nUtil
+          ? i18nUtil.definitions()
+          : i18nUtil.definitions([]));
+
         validateItems(definitions, []);
 
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('throws on invalid path', () => {
+      test('throws on invalid path', async () => {
         if (i18nUtil instanceof LoadedI18nUtil) return;
 
         const nonpaths = paths.map((p) => p + 'nonsense');
-        const action = () => i18nUtil.definitions(nonpaths);
-        expect(action).toThrow();
+        const action = async () => i18nUtil.definitions(nonpaths);
+
+        expect(action).rejects.toThrow();
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         if (i18nUtil instanceof LoadedI18nUtil) return;
 
-        const definitions =
-          i18nUtil instanceof LoadedI18nUtil
-            ? i18nUtil.definitions()
-            : i18nUtil.definitions(paths, { test: 'confirmed' });
+        const definitions = await (i18nUtil instanceof LoadedI18nUtil
+          ? i18nUtil.definitions()
+          : i18nUtil.definitions(paths, { test: 'confirmed' }));
 
         validateItems(definitions, inputDefs);
 
@@ -104,11 +104,10 @@ parametrizeInstance(
         });
       });
 
-      test('returns definitions from analysed files', () => {
-        const definitions =
-          i18nUtil instanceof LoadedI18nUtil
-            ? i18nUtil.definitions()
-            : i18nUtil.definitions(paths);
+      test('returns definitions from analysed files', async () => {
+        const definitions = await (i18nUtil instanceof LoadedI18nUtil
+          ? i18nUtil.definitions()
+          : i18nUtil.definitions(paths));
 
         validateItems(definitions, inputDefs);
 
@@ -121,34 +120,36 @@ parametrizeInstance(
       const globs = ['src/lib/i18n-util/__tests__/fixtures/*.{vue,json}'];
       const paths = flatten(globs.map((p) => globSync(p)));
 
-      test('returns empty on empty array', () => {
+      test('returns empty on empty array', async () => {
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [];
         }
 
-        const usage = i18nUtil.usage([]);
+        const usage = await i18nUtil.usage([]);
         validateItems(usage, [], UsageItem);
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('throws on invalid path', () => {
+      test('throws on invalid path', async () => {
         const nonpaths = paths.map((p) => p + 'nonsense');
-        const action = () => i18nUtil.usage(nonpaths);
-        expect(action).toThrow();
+        const action = async () => i18nUtil.usage(nonpaths);
+
+        expect(action).rejects.toThrow();
       });
 
-      test('options are passed to adaptors', () => {
-        i18nUtil.usage(paths, { test: 'confirmed' });
+      test('options are passed to adaptors', async () => {
+        await i18nUtil.usage(paths, { test: 'confirmed' });
 
         validateAdaptorCalls(adaptorSpies, { usageAnalyzer: 1 });
+
         forEachAdaptor(adaptorSpies, ({ usageAnalyzer }) => {
           expect(usageAnalyzer.mock.calls[0][1]).toBeDefined();
           expect(usageAnalyzer.mock.calls[0][1].test).toBe('confirmed');
         });
       });
 
-      test('returns definitions from analysed files', () => {
-        const usage = i18nUtil.usage(paths);
+      test('returns definitions from analysed files', async () => {
+        const usage = await i18nUtil.usage(paths);
 
         validateItems(
           usage,
@@ -176,41 +177,45 @@ parametrizeInstance(
         ];
       });
 
-      test("doesn't call writers on empty array", () => {
+      test("doesn't call writers on empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? i18nUtil.write()
-          : i18nUtil.write(defs);
+          : i18nUtil.write(defs));
 
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls writers with definitions', () => {
-        i18nUtil instanceof LoadedI18nUtil
+      test('calls writers with definitions', async () => {
+        await (i18nUtil instanceof LoadedI18nUtil
           ? i18nUtil.write()
-          : i18nUtil.write(inputDefs);
+          : i18nUtil.write(inputDefs));
 
         writers.forEach(([writer, defs]) => {
           expect(writer.mock.calls[0][0]).toBeDefined();
           validateItems(writer.mock.calls[0][0], defs);
         });
+
         validateAdaptorCalls(adaptorSpies, { writer: 1 });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? i18nUtil.write(options)
-          : i18nUtil.write(inputDefs, options);
+          : i18nUtil.write(inputDefs, options));
 
         writers.forEach(([writer]) => {
           expect(writer.mock.calls[0][1]).toBeDefined();
           expect(writer.mock.calls[0][1].test).toBe('confirmed');
         });
+
         validateAdaptorCalls(adaptorSpies, { writer: 1 });
       });
     });
@@ -265,26 +270,30 @@ parametrizeInstance(
         ];
       });
 
-      test("doesn't call writers nor parsers on empty array", () => {
+      test("doesn't call writers nor parsers on empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls parsers of adaptors that matched files of definitions ', () => {
+      test('calls parsers of adaptors that matched files of definitions ', async () => {
         const defs = patchDefinitions;
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         adaptors.forEach(([{ parser, files }]) => {
           expect(parser.mock.calls[0][0]).toBeDefined();
@@ -294,32 +303,35 @@ parametrizeInstance(
         validateAdaptorCalls(adaptorSpies, { parser: 1, writer: null });
       });
 
-      test('calls writers of adaptors that matched files of definitions ', () => {
+      test('calls writers of adaptors that matched files of definitions ', async () => {
         const defs = patchDefinitions;
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         adaptors.forEach(([{ writer, expected }]) => {
           expect(writer.mock.calls[0][0]).toBeDefined();
           validateItems(writer.mock.calls[0][0], expected);
         });
+
         validateAdaptorCalls(adaptorSpies, { writer: 1, parser: null });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
         const defs = patchDefinitions;
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs, options)
-          : method(i18nUtil, defs, defs, options);
+          : method(i18nUtil, defs, defs, options));
 
         adaptors.forEach(([{ writer, parser }]) => {
           expect(parser.mock.calls[0][1]).toBeDefined();
@@ -327,6 +339,7 @@ parametrizeInstance(
           expect(writer.mock.calls[0][1]).toBeDefined();
           expect(writer.mock.calls[0][1].test).toBe('confirmed');
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: 1, writer: 1 });
       });
     });
@@ -387,46 +400,53 @@ parametrizeInstance(
         ];
       });
 
-      test("doesn't call any adaptor methods on empty array", () => {
+      test("doesn't call any adaptor methods on empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls parsers of adaptors that matched files of definitions ', () => {
+      test('calls parsers of adaptors that matched files of definitions ', async () => {
         const defs = dropDefinitions;
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         validateAdaptorCalls(adaptorSpies, {
           parser: 1,
           writer: null,
           remover: null,
         });
+
         adaptors.forEach(([{ parser, files }]) => {
           expect(parser.mock.calls[0][0]).toBeDefined();
           expect(parser.mock.calls[0][0]).toEqual(files);
         });
       });
 
-      test('calls writers of adaptors that matched files of definitions ', () => {
+      test('calls writers of adaptors that matched files of definitions ', async () => {
         const defs = dropDefinitions;
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         adaptors.forEach(([{ writer, expected }]) => {
           if (expected.length > 0) {
@@ -437,6 +457,7 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -444,14 +465,14 @@ parametrizeInstance(
         });
       });
 
-      test('calls removers of adaptors that matched files of definitions if dropped items result to no items remaining', () => {
+      test('calls removers of adaptors that matched files of definitions if dropped items result to no items remaining', async () => {
         const defs = dropDefinitions;
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs)
-          : method(i18nUtil, defs, defs);
+          : method(i18nUtil, defs, defs));
 
         adaptors.forEach(([{ remover, removedFiles }]) => {
           if (!removedFiles.length) {
@@ -464,6 +485,7 @@ parametrizeInstance(
             expect(remover.mock.calls[0][0]).toContainEqual(file);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -471,16 +493,17 @@ parametrizeInstance(
         });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
         const defs = dropDefinitions;
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, defs, options)
-          : method(i18nUtil, defs, defs, options);
+          : method(i18nUtil, defs, defs, options));
 
         adaptors.forEach(([{ writer, parser, remover, expected }]) => {
           expect(parser).toBeCalledTimes(1);
@@ -503,6 +526,7 @@ parametrizeInstance(
             expect(remover).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -550,25 +574,26 @@ parametrizeInstance(
         ];
       });
 
-      test("doesn't call writers nor parsers on empty array and returns empty array", () => {
+      test("doesn't call writers nor parsers on empty array and returns empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, defs, locale);
+
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, defs, locale));
 
         validateItems(res, []);
+
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls parsers of adaptors that matched files of added definitions and returns added definitions', () => {
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, [...inputDefs], locale);
+      test('calls parsers of adaptors that matched files of added definitions and returns added definitions', async () => {
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, [...inputDefs], locale));
 
         validateItems(res, [
           ...addLocaleDefinitionsJY,
@@ -584,13 +609,14 @@ parametrizeInstance(
             expect(parser).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
 
-      test('calls writers of adaptors that matched files of added definitions ', () => {
-        i18nUtil instanceof LoadedI18nUtil
+      test('calls writers of adaptors that matched files of added definitions ', async () => {
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale)
-          : method(i18nUtil, [...inputDefs], locale);
+          : method(i18nUtil, [...inputDefs], locale));
 
         adaptors.forEach(([{ writer, expected }]) => {
           if (expected.length) {
@@ -601,15 +627,16 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale, options)
-          : method(i18nUtil, [...inputDefs], locale, options);
+          : method(i18nUtil, [...inputDefs], locale, options));
 
         adaptors.forEach(([{ writer, parser, expected }]) => {
           if (expected.length) {
@@ -628,6 +655,7 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
     });
@@ -687,6 +715,7 @@ parametrizeInstance(
             },
           ],
         ];
+
         adaptors.forEach((adaptorArr) => {
           const adaptor = adaptorArr[0];
           adaptor.modifiedFiles = differenceBy(
@@ -696,25 +725,26 @@ parametrizeInstance(
         });
       });
 
-      test("doesn't call any adaptor methods on empty array and returns empty array", () => {
+      test("doesn't call any adaptor methods on empty array and returns empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, defs, locale);
+
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, defs, locale));
 
         validateItems(res, []);
+
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls parsers of adaptors that matched files of removed definitions and returns removed definitions', () => {
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, inputDefs, locale);
+      test('calls parsers of adaptors that matched files of removed definitions and returns removed definitions', async () => {
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, inputDefs, locale));
 
         validateItems(res, [
           ...removeLocaleDefinitionsJY,
@@ -730,6 +760,7 @@ parametrizeInstance(
             expect(parser).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -737,10 +768,10 @@ parametrizeInstance(
         });
       });
 
-      test('calls writers of adaptors that matched files of removed definitions ', () => {
-        i18nUtil instanceof LoadedI18nUtil
+      test('calls writers of adaptors that matched files of removed definitions ', async () => {
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale)
-          : method(i18nUtil, inputDefs, locale);
+          : method(i18nUtil, inputDefs, locale));
 
         adaptors.forEach(([{ writer, expected, modifiedFiles }]) => {
           if (modifiedFiles.length > 0) {
@@ -751,6 +782,7 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -758,10 +790,10 @@ parametrizeInstance(
         });
       });
 
-      test('calls removers of adaptors that matched files of definitions if dropped items result to no items remaining', () => {
-        i18nUtil instanceof LoadedI18nUtil
+      test('calls removers of adaptors that matched files of definitions if dropped items result to no items remaining', async () => {
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale)
-          : method(i18nUtil, inputDefs, locale);
+          : method(i18nUtil, inputDefs, locale));
 
         adaptors.forEach(([{ remover, removedFiles }]) => {
           if (!removedFiles.length) {
@@ -774,6 +806,7 @@ parametrizeInstance(
             expect(remover.mock.calls[0][0]).toContainEqual(file);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -781,12 +814,12 @@ parametrizeInstance(
         });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale, options)
-          : method(i18nUtil, inputDefs, locale, options);
+          : method(i18nUtil, inputDefs, locale, options));
 
         adaptors.forEach(
           ([
@@ -817,6 +850,7 @@ parametrizeInstance(
             }
           },
         );
+
         validateAdaptorCalls(adaptorSpies, {
           parser: null,
           writer: null,
@@ -870,25 +904,26 @@ parametrizeInstance(
         ];
       });
 
-      test("doesn't call any adaptor methods on empty array and returns empty array", () => {
+      test("doesn't call any adaptor methods on empty array and returns empty array", async () => {
         const defs = [] as DefItem[];
+
         if (i18nUtil instanceof LoadedI18nUtil) {
           i18nUtil.loaded.items = [...defs];
         }
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, defs, locale);
+
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, defs, locale));
 
         validateItems(res, []);
+
         validateAdaptorCalls(adaptorSpies);
       });
 
-      test('calls parsers of adaptors that matched files of cleared definitions and returns cleared definitions', () => {
-        const res =
-          i18nUtil instanceof LoadedI18nUtil
-            ? method(i18nUtil, locale)
-            : method(i18nUtil, inputDefs, locale);
+      test('calls parsers of adaptors that matched files of cleared definitions and returns cleared definitions', async () => {
+        const res = await (i18nUtil instanceof LoadedI18nUtil
+          ? method(i18nUtil, locale)
+          : method(i18nUtil, inputDefs, locale));
 
         validateItems(res, [
           ...clearLocaleDefinitionsJY,
@@ -904,13 +939,14 @@ parametrizeInstance(
             expect(parser).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
 
-      test('calls writers of adaptors that matched files of cleared definitions', () => {
-        i18nUtil instanceof LoadedI18nUtil
+      test('calls writers of adaptors that matched files of cleared definitions', async () => {
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale)
-          : method(i18nUtil, inputDefs, locale);
+          : method(i18nUtil, inputDefs, locale));
 
         adaptors.forEach(([{ writer, expected, cleared }]) => {
           if (cleared.length) {
@@ -921,15 +957,16 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
 
-      test('options are passed to adaptors', () => {
+      test('options are passed to adaptors', async () => {
         const options = { test: 'confirmed' };
 
-        i18nUtil instanceof LoadedI18nUtil
+        await (i18nUtil instanceof LoadedI18nUtil
           ? method(i18nUtil, locale, options)
-          : method(i18nUtil, inputDefs, locale, options);
+          : method(i18nUtil, inputDefs, locale, options));
 
         adaptors.forEach(([{ writer, parser, cleared, name }]) => {
           if (cleared.length) {
@@ -948,6 +985,7 @@ parametrizeInstance(
             expect(writer).toBeCalledTimes(0);
           }
         });
+
         validateAdaptorCalls(adaptorSpies, { parser: null, writer: null });
       });
     });

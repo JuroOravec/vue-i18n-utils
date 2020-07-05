@@ -15,7 +15,7 @@ import { deepWalk, mergeDeepWith, createObjectPath } from '../util/walk';
 
 export class Item implements I_Item.Item {
   value: I_Item.Item['value'];
-  path?: I_Item.Item['path'];
+  path: I_Item.Item['path'];
   line?: I_Item.Item['line'];
   column?: I_Item.Item['column'];
   locale?: I_Item.Item['locale'];
@@ -34,7 +34,7 @@ export class Item implements I_Item.Item {
     blockIndex,
   }: I_Item.CtorOptions) {
     this.value = value;
-    this.path = path;
+    this.path = path || [];
     this.line = line;
     this.column = column;
     this.locale = locale;
@@ -43,15 +43,15 @@ export class Item implements I_Item.Item {
     this.blockIndex = blockIndex;
   }
 
-  get pathHash() {
+  get pathHash(): number {
     return hashStringArray(this.path ?? []);
   }
 
-  get localeTokenHash() {
+  get localeTokenHash(): number {
     return hashStringArray([this.locale ?? '', this.pathHash.toString()]);
   }
 
-  get sourceHash() {
+  get sourceHash(): number {
     return hashStringArray([
       this.source ?? '',
       this.origin ?? '',
@@ -59,7 +59,7 @@ export class Item implements I_Item.Item {
     ]);
   }
 
-  get positionHash() {
+  get positionHash(): number {
     return hashStringArray([
       this.line?.toString() ?? '',
       this.column?.toString() ?? '',
@@ -70,7 +70,7 @@ export class Item implements I_Item.Item {
     ]);
   }
 
-  get idHash() {
+  get idHash(): number {
     return hashStringArray([
       this.line?.toString() ?? '',
       this.column?.toString() ?? '',
@@ -82,19 +82,21 @@ export class Item implements I_Item.Item {
     ]);
   }
 
-  copy(newValuesObj: Partial<I_Item.CtorOptions> = {}) {
+  copy(newValuesObj: Partial<I_Item.CtorOptions> = {}): I_Item.Item {
     const Klass = this.constructor as new (...args: any[]) => I_Item.Item;
     const copy = new Klass(this);
+
     for (const [key, val] of Object.entries(newValuesObj)) {
       (copy as any)[key] = val;
     }
+
     return copy;
   }
 }
 
 const getIteratee = <T extends I_Item.Item = I_Item.Item>(
   hashType: I_Item.HashType,
-) => {
+): ((item: T) => number) => {
   const iteratees = {
     path: (item: T) => item.pathHash,
     localeToken: (item: T) => item.localeTokenHash,
@@ -104,10 +106,6 @@ const getIteratee = <T extends I_Item.Item = I_Item.Item>(
   };
   return iteratees[hashType] as (item: T) => number;
 };
-
-export interface ItemArray {
-  constructor: typeof ItemArray;
-}
 
 /**
  * Container class for holding and manipulating a list of items.
@@ -120,38 +118,41 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     this.items = [...items];
   }
 
-  [Symbol.iterator]() {
+  [Symbol.iterator](): IterableIterator<T> {
     return this.items[Symbol.iterator]();
   }
 
-  push(...items: T[]) {
+  push(...items: T[]): number {
     return this.items.push(...items);
   }
 
-  get length() {
+  get length(): number {
     return this.items.length;
   }
 
-  toJSON() {
+  toJSON(): any {
     return this.items;
   }
 
-  prop<K extends keyof T>(prop: K) {
+  prop<K extends keyof T>(prop: K): T[K][] {
     return this.constructor.prop<T, K>(this.items, prop);
   }
 
-  static prop<T extends I_Item.Item, K extends keyof T>(items: T[], prop: K) {
-    return mapFilter(items, (item) => item[prop]) as T[K][];
+  static prop<T extends I_Item.Item, K extends keyof T>(
+    items: T[],
+    prop: K,
+  ): T[K][] {
+    return mapFilter(items, (item) => item[prop]);
   }
 
-  uniqProp<K extends keyof T>(prop: K) {
+  uniqProp<K extends keyof T>(prop: K): NonNullable<T[K]>[] {
     return this.constructor.uniqProp<T, K>(this.items, prop);
   }
 
   static uniqProp<T extends I_Item.Item, K extends keyof T>(
     items: T[],
     prop: K,
-  ) {
+  ): NonNullable<T[K]>[] {
     return mapFilterUniq(items, (item) => item[prop]) as NonNullable<T[K]>[];
   }
 
@@ -169,7 +170,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     array: I_Item.ItemArrayLike<T>,
     other: I_Item.ItemArrayLike,
     options: I_Item.DifferenceOptions = {},
-  ): I_Item.ItemArray<T> {
+  ) {
     const { hashType = 'id' } = options;
     return new this(
       differenceBy([...array], [...other], getIteratee(hashType)) as T[],
@@ -187,7 +188,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     array: I_Item.ItemArrayLike<T>,
     other: I_Item.ItemArrayLike<T>,
     options: I_Item.UnionOptions = {},
-  ): I_Item.ItemArray<T> {
+  ) {
     const { hashType = 'id' } = options;
     return new this(unionBy([...array], [...other], getIteratee(hashType)));
   }
@@ -208,7 +209,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     array: I_Item.ItemArrayLike<T>,
     other: I_Item.ItemArrayLike,
     options: I_Item.IntersectionOptions = {},
-  ): I_Item.ItemArray<T> {
+  ) {
     const { hashType = 'id' } = options;
     const transformer = getIteratee(hashType);
     const alreadyAdded = new Set<number>();
@@ -232,7 +233,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
   updateBy<T2 extends I_Item.Item>(
     other: I_Item.ItemArrayLike<T2>,
     options: I_Item.UpdateByOptions<T, T2> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.constructor.updateBy<T, T2>(this.items, other, options);
   }
 
@@ -257,11 +258,13 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     const updaters = ArrayMap.groupBy([...other], transformer);
     const updated = new this([] as T[]);
     const unmatched = new Map<number, ItemArray<T2>>();
+
     for (const [key, updaterItems] of updaters) {
       if (!updatees.has(key) && !addUnmatched) {
         unmatched.set(key, new this(updaterItems));
         continue;
       }
+
       const itemsToUpdate = updatees.has(key)
         ? updatees.get(key)!
         : // Add new item if nothing matched
@@ -280,18 +283,19 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
         ),
       );
     }
+
     return {
       items: updated.union(itemsCopy, options),
       updated,
       unmatched,
-    } as I_Item.UpdateReturn<T, T2>;
+    };
   }
 
   updateProp<T2 extends I_Item.Item>(
     other: I_Item.ItemArrayLike<T2>,
     prop: keyof T,
     options: I_Item.UpdatePropOptions<T> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.constructor.updateProp<T, T2>(this.items, other, prop, options);
   }
 
@@ -300,7 +304,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     other: I_Item.ItemArrayLike<T2>,
     prop: keyof T,
     options: I_Item.UpdatePropOptions<T> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.updateProps<T, T2>(items, other, [prop], options);
   }
 
@@ -308,7 +312,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     other: I_Item.ItemArrayLike<T2>,
     props: (keyof T)[],
     options: I_Item.UpdatePropOptions<T> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.constructor.updateProps<T, T2>(
       this.items,
       other,
@@ -322,7 +326,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     other: I_Item.ItemArrayLike<T2>,
     props: (keyof T)[],
     options: I_Item.UpdatePropOptions<T> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.updateBy<T, T2>(items, other, {
       ...options,
       updater: (updatee, updater) => updatee.copy(pick(updater, props)) as T,
@@ -332,7 +336,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
   update<T2 extends I_Item.Item>(
     other: I_Item.ItemArrayLike<T2>,
     options: I_Item.UpdateOptions<T, T2> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     return this.constructor.update<T, T2>(this.items, other, options);
   }
 
@@ -340,7 +344,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     items: I_Item.ItemArrayLike<T>,
     other: I_Item.ItemArrayLike<T2>,
     options: I_Item.UpdateOptions<T, T2> = {},
-  ) {
+  ): I_Item.UpdateReturn<T, T2> {
     const { updater } = options;
     return typeof updater === 'string'
       ? this.updateProp(items, other, updater, options)
@@ -380,13 +384,16 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
 
     for (const item of items) {
       const pathId = item.pathHash as T['pathHash'];
+
       for (const locale of locales) {
         const map = localeItemsMaps.get(locale)!;
+
         // Capture all items matching the locale
         if (item.locale === locale) {
           map.set(pathId, item);
           continue;
         }
+
         // In case the locale is missing some entries which are present in other
         // locales, add the item from the other locale, and remove its value to
         // make it clear that the value is missing.
@@ -399,9 +406,11 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
         }
       }
     }
+
     const filteredItems = flatten(
       locales.map((locale) => [...localeItemsMaps.get(locale)!.values()]),
     );
+
     return new this(filteredItems);
   }
 
@@ -438,6 +447,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     options?: I_Item.FilterByOptions,
   ) {
     const { mode = 'include' } = options || {};
+
     return new this(
       Array.from(items).filter((item) => {
         const passed = callback(item);
@@ -535,14 +545,16 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
     );
   }
 
-  duplicates(options: { hashType?: I_Item.HashType } = {}) {
+  duplicates(
+    options: { hashType?: I_Item.HashType } = {},
+  ): ArrayMap<number, T> {
     return this.constructor.duplicates<T>(this.items, options);
   }
 
   static duplicates<T extends I_Item.Item>(
     items: I_Item.ItemArrayLike<T>,
     options: { hashType?: I_Item.HashType } = {},
-  ) {
+  ): ArrayMap<number, T> {
     const { hashType = 'localeToken' } = options;
     const transformer = getIteratee(hashType);
     const groups = ArrayMap.groupBy([...items], transformer);
@@ -681,7 +693,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
   static fromObjects<T extends I_Item.Item, CtorOpts extends object = object>(
     objs: AnyObj[],
     params: I_Item.FromObjectOptions<T> & CtorOpts,
-  ) {
+  ): I_Item.ItemArray<T> {
     const {
       itemClass,
       locale,
@@ -689,11 +701,13 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
       includeMissing,
       missingValue,
     } = merge({}, this.defaults, params);
+
     const items = new this([] as T[]);
     const uniqItemFirstSeen = new Map<
       T['idHash'],
       { index: number; value: T }
     >();
+
     objs.forEach((obj, index) =>
       deepWalk<AnyObj, object, any | I_Item.ItemArray<T> | T>(
         {
@@ -743,7 +757,7 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
   static fromObject<T extends I_Item.Item, CtorOpts extends object = object>(
     obj: AnyObj,
     params: I_Item.FromObjectOptions<T> & CtorOpts,
-  ) {
+  ): I_Item.ItemArray<T> {
     return this.fromObjects<T, CtorOpts>([obj], params);
   }
 
@@ -760,6 +774,10 @@ export class ItemArray<T extends I_Item.Item = I_Item.Item>
   }
 }
 
-export function isItem(item: any) {
+export interface ItemArray {
+  constructor: typeof ItemArray;
+}
+
+export function isItem(item: any): boolean {
   return item instanceof Item || item instanceof ItemArray;
 }

@@ -1,12 +1,12 @@
-const schemaGen = require('generate-schema');
+import schemaGen from 'generate-schema';
 import merge from 'lodash.merge';
 
 import { ISchemator } from './types';
 import { schematorDebug } from '../util/debug';
 import { deepWalk } from '../util/walk';
 
-export interface AbstractSchemator {
-  constructor: typeof AbstractSchemator;
+interface Defaults {
+  logger: AbstractSchemator['logger'];
 }
 
 export abstract class AbstractSchemator implements ISchemator.Schemator {
@@ -20,19 +20,22 @@ export abstract class AbstractSchemator implements ISchemator.Schemator {
     this.logger = logger || fallbackLogger;
   }
 
-  generate(data: any, options?: ISchemator.GenerateOptions) {
-    return {} as any;
+  generate(data: any, options?: ISchemator.GenerateOptions): any {
+    return {};
   }
-  serialize(schema: any, options?: ISchemator.SerializeOptions) {
-    return '' as string | Buffer;
+  serialize(
+    schema: any,
+    options?: ISchemator.SerializeOptions,
+  ): string | Buffer {
+    return '';
   }
-  deserialize(schema: string, options?: ISchemator.DeserializeOptions) {
-    return {} as any;
+  deserialize(schema: string, options?: ISchemator.DeserializeOptions): any {
+    return {};
   }
 
-  static get defaults() {
+  static get defaults(): Defaults {
     return {
-      logger: schematorDebug as AbstractSchemator['logger'],
+      logger: schematorDebug,
     };
   }
 }
@@ -90,15 +93,18 @@ export class Schemator extends AbstractSchemator
     }
 
     let scopedSchema = schema;
+
     if (type === 'json') {
       if (scope === 'master') {
         // Move the schema properties one level deeper and set the top level to
         // accept any string (which would be the locale)
         const { properties, required, ...masterSchema } = schema;
         const { title, ...subschema } = schema;
+
         masterSchema.patternProperties = {
           '^.*$': subschema,
         };
+
         Object.assign(masterSchema, {
           type: 'object',
           // Even if `additionalProperties` === true, we set the top level to
@@ -106,6 +112,7 @@ export class Schemator extends AbstractSchemator
           // additional props as set
           additionalProperties: false,
         });
+
         scopedSchema = masterSchema;
       } else {
         scopedSchema = schema;
@@ -122,10 +129,13 @@ export class Schemator extends AbstractSchemator
    */
   serialize(schema: any, options: ISchemator.SerializeOptions = {}) {
     this.logger(`Serializing schema`);
+
     const { type } = merge({}, Schemator.defaults, this.options, options);
+
     const res = Schemator.stringTypes.includes(type)
       ? (schema as string)
       : JSON.stringify(schema, null, 2);
+
     this.logger(`Done serializing schema`);
     return res;
   }
@@ -138,11 +148,14 @@ export class Schemator extends AbstractSchemator
     options: ISchemator.SerializeOptions = {},
   ) {
     this.logger(`Deserializing schema`);
+
     const { type } = merge({}, Schemator.defaults, this.options, options);
     const res = Schemator.stringTypes.includes(type)
       ? serializedSchema
       : JSON.parse(serializedSchema);
+
     this.logger(`Done deserializing schema`);
+
     return res;
   }
 
@@ -156,7 +169,7 @@ export class Schemator extends AbstractSchemator
     return types;
   }
 
-  static get defaults() {
+  static get defaults(): Required<ISchemator.CtorOptions> {
     return {
       ...super.defaults,
       type: 'json',
@@ -164,6 +177,10 @@ export class Schemator extends AbstractSchemator
       scope: 'locale',
       required: true,
       additionalProperties: false,
-    } as Required<ISchemator.CtorOptions>;
+    };
   }
+}
+
+export interface AbstractSchemator {
+  constructor: typeof AbstractSchemator;
 }

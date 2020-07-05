@@ -10,7 +10,10 @@ import { collect } from './util';
 /**
  * Apply options that allow to select and filter definition and usage items
  */
-export function applyItemOptions(cmd: Cmd, options: { desc?: string } = {}) {
+export function applyItemOptions(
+  cmd: Cmd,
+  options: { desc?: string } = {},
+): void {
   const { desc } = options;
   const purposeMsg = desc ? ' ' + desc : '';
   cmd
@@ -113,7 +116,7 @@ export function applyItemOptions(cmd: Cmd, options: { desc?: string } = {}) {
     );
 }
 
-export function processItemOptions<
+export async function processItemOptions<
   T extends {
     asUsage?: boolean;
     defFile: string[];
@@ -157,11 +160,12 @@ export function processItemOptions<
     unused,
     defined,
     excludeDefined,
-    undefined,
+    undefined: undef,
     issues,
     excludeIssues,
     ...unknownOpts
   } = options;
+
   const defOptions = {
     key,
     excludeKey,
@@ -173,27 +177,35 @@ export function processItemOptions<
     missing,
     excludeMissing,
   };
+
   const usageOptions = {
     key,
     excludeKey,
   };
+
   const keyOptions = {
     used,
     excludeUsed,
     unused,
     defined,
     excludeDefined,
-    undefined,
+    undefined: undef,
     issues,
     excludeIssues,
   };
+
   const defPaths = [...(asUsage ? [] : paths), ...defFiles];
   const usePaths = [...(asUsage ? paths : []), ...usageFiles];
-  const { items: defItems } = processDefinitionOptions(i18nUtil, defPaths, {
-    ...defOptions,
-    ...unknownOpts,
-  });
-  const { items: useItems } = processUsageOptions(i18nUtil, usePaths, {
+
+  const { items: defItems } = await processDefinitionOptions(
+    i18nUtil,
+    defPaths,
+    {
+      ...defOptions,
+      ...unknownOpts,
+    },
+  );
+  const { items: useItems } = await processUsageOptions(i18nUtil, usePaths, {
     ...usageOptions,
     ...unknownOpts,
   });
@@ -254,11 +266,13 @@ export function processKeyOptions<
     } else {
       const pathWithIssues = stats.keysIssues.map((key) => key.path);
       const mode = issues ? 'include' : 'exclude';
+
       items.def = ItemArray.filterByPaths<IDefinition.Item>(
         items.def,
         pathWithIssues,
         { mode },
       ).items;
+
       items.use = ItemArray.filterByPaths<IUsage.Item>(
         items.use,
         pathWithIssues,
@@ -274,12 +288,14 @@ export function processKeyOptions<
     } else {
       const usedPaths = stats.definitionsUsed.map((def) => def.path);
       const mode = used ? 'include' : 'exclude';
+
       items.def = ItemArray.filterByPaths<IDefinition.Item>(
         items.def,
         usedPaths,
         { mode },
       ).items;
     }
+
     // update usage items to match remaining def items
     items.use = ItemArray.filterByPaths<IUsage.Item>(
       items.use,
@@ -295,12 +311,14 @@ export function processKeyOptions<
     } else {
       const definedPaths = stats.usageDefined.map((def) => def.path);
       const mode = defined ? 'include' : 'exclude';
+
       items.use = ItemArray.filterByPaths<IUsage.Item>(
         items.use,
         definedPaths,
         { mode },
       ).items;
     }
+
     // update def items to match remaining usage items
     items.def = ItemArray.filterByPaths<IDefinition.Item>(
       items.def,
@@ -312,7 +330,7 @@ export function processKeyOptions<
   return { defItems: items.def, useItems: items.use, unparsed };
 }
 
-export function processDefinitionOptions<
+export async function processDefinitionOptions<
   T extends {
     key: string[];
     excludeKey: string[];
@@ -344,11 +362,11 @@ export function processDefinitionOptions<
   if (!excludeMissing) defOpts.includeMissing = true;
   if (missingValue !== undefined) defOpts.missingValue = missingValue;
 
-  const items = i18nUtil.definitions(paths, defOpts);
+  const items = await i18nUtil.definitions(paths, defOpts);
   return filterDefinitions(i18nUtil, items, options);
 }
 
-export function filterDefinitions<
+export async function filterDefinitions<
   T extends {
     key: string[];
     excludeKey: string[];
@@ -384,17 +402,22 @@ export function filterDefinitions<
       );
       itemArr.push(...missingItems);
     }
+
     const mode = excludeMissing ? 'exclude' : 'include';
     itemArr = itemArr.filterMissing({ mode });
   }
 
   if (locale.length) {
-    const locales = i18nUtil.resolveLocales(itemArr.items, locale, unknownOpts);
+    const locales = await i18nUtil.resolveLocales(
+      itemArr.items,
+      locale,
+      unknownOpts,
+    );
     itemArr = itemArr.filterByLocales(locales, { mode: 'include' });
   }
 
   if (excludeLocale.length) {
-    const locales = i18nUtil.resolveLocales(
+    const locales = await i18nUtil.resolveLocales(
       itemArr.items,
       excludeLocale,
       unknownOpts,
@@ -403,22 +426,30 @@ export function filterDefinitions<
   }
 
   if (key.length) {
-    const paths = i18nUtil.resolveKeys(itemArr.items, key, unknownOpts);
+    const paths = await i18nUtil.resolveKeys(itemArr.items, key, unknownOpts);
     itemArr = itemArr.filterByPaths(paths, { mode: 'include' });
   }
 
   if (excludeKey.length) {
-    const paths = i18nUtil.resolveKeys(itemArr.items, excludeKey, unknownOpts);
+    const paths = await i18nUtil.resolveKeys(
+      itemArr.items,
+      excludeKey,
+      unknownOpts,
+    );
     itemArr = itemArr.filterByPaths(paths, { mode: 'exclude' });
   }
 
   if (value.length) {
-    const values = i18nUtil.resolveValues(itemArr.items, value, unknownOpts);
+    const values = await i18nUtil.resolveValues(
+      itemArr.items,
+      value,
+      unknownOpts,
+    );
     itemArr = itemArr.filterByValues(values, { mode: 'include' });
   }
 
   if (excludeValue.length) {
-    const values = i18nUtil.resolveValues(
+    const values = await i18nUtil.resolveValues(
       itemArr.items,
       excludeValue,
       unknownOpts,
@@ -429,7 +460,7 @@ export function filterDefinitions<
   return { items: itemArr.items, unparsed: unknownOpts };
 }
 
-function processUsageOptions<
+async function processUsageOptions<
   T extends {
     key: string[];
     excludeKey: string[];
@@ -438,15 +469,15 @@ function processUsageOptions<
   const { key, excludeKey, ...unparsed } = options;
 
   const useOpts = { ...unparsed } as I_I18nUtil.UsageOptions;
-  let items = new ItemArray(i18nUtil.usage(paths, useOpts));
+  let items = new ItemArray(await i18nUtil.usage(paths, useOpts));
 
   if (key.length) {
-    const paths = i18nUtil.resolveKeys(items.items, key, unparsed);
+    const paths = await i18nUtil.resolveKeys(items.items, key, unparsed);
     items = items.filterByPaths(paths, { mode: 'include' });
   }
 
   if (excludeKey.length) {
-    const paths = i18nUtil.resolveKeys(items.items, excludeKey, unparsed);
+    const paths = await i18nUtil.resolveKeys(items.items, excludeKey, unparsed);
     items = items.filterByPaths(paths, { mode: 'exclude' });
   }
 

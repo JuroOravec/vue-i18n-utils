@@ -38,15 +38,17 @@ export function createExportCmd(program?: Cmd, options: CommandOptions = {}) {
     .action(
       loadFromCli(
         { program, args: ['output', 'expand', 'array', 'join'] },
-        ({ i18nUtil, defItems, useItems, opts, unknownOpts }) => {
+        async ({ i18nUtil, defItems, useItems, opts, unknownOpts }) => {
           const { output, expand, array: asArray, join: merge } = opts;
 
           const simple = !expand;
+
           const items = I18nItemArray.exportItems(
             [...defItems, ...useItems],
             output,
           );
-          i18nUtil.write(items as IDefinition.Item[], {
+
+          await i18nUtil.write(items as IDefinition.Item[], {
             ...unknownOpts,
             simple,
             asArray,

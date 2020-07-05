@@ -1,5 +1,5 @@
 import path from 'path';
-import fs from 'fs';
+import fs, { promises as fsp } from 'fs';
 import yaml from 'js-yaml';
 import flattenDeep from 'lodash.flattendeep';
 import merge from 'lodash.merge';
@@ -17,9 +17,10 @@ import { DefinitionItem, DefinitionArray } from '../../definition';
 import { safeWrite } from '../../util/fs';
 import { ContentGroup, IContentGroup } from '../../content-group';
 import { ContentBlock } from '../../content-block';
-import { ContentFormatter } from '../../content-formatter';
-import { PathFormatter } from '../../path-formatter';
+import { ContentFormatter, IContentFormatter } from '../../content-formatter';
+import { PathFormatter, IPathFormatter } from '../../path-formatter';
 import { jyDebug as debug } from '../../util/debug';
+import { pMap } from '../../util/array';
 
 export type FileSystem = typeof fs;
 
@@ -41,70 +42,82 @@ export class JsonYamlContentGroup extends ContentGroup {
 
   constructor(options: IAdaptorJY.ContentGroupCtorOptions = {}) {
     const parsedOpts = merge({}, JsonYamlAdaptor.defaults, options);
-    const { content, logger, ...opts } = parsedOpts;
+    const { logger, ...opts } = parsedOpts;
     super(opts);
 
-    const {
-      logger: fallbackLogger,
-      contentBlockClass: ContentBlock,
-    } = this.constructor.defaults;
+    const { logger: fallbackLogger } = this.constructor.defaults;
 
     this.blocks = [];
     this.logger = logger || fallbackLogger;
-
-    if (content) {
-      const {
-        name,
-        methods: { deserializer = null, serializer = null } = {},
-        options: serOpts = {},
-      } =
-        JsonYamlAdaptor.resolveSerializer(
-          this.serializers!,
-          this.filepath ?? 'json',
-          parsedOpts,
-        ) || {};
-      this.serializers?.validateMethod(name!, 'deserializer');
-      this.serializers?.validateMethod(name!, 'serializer');
-      this.logger(
-        `Parsing content of file '${this.filepath}' with serializer '${name}'`,
-      );
-      const data = deserializer!(content, serOpts);
-
-      // In case the top-level data is (not) an array, normalize to array and
-      // remember the state.
-      const rootIsArray = Array.isArray(data);
-      const dataArr = Array.isArray(data) ? data : data ? [data] : [];
-
-      this.blocks = dataArr.map((dataBlock, index) => {
-        const block = new ContentBlock({
-          serializers: this.serializers,
-          filepath: this.filepath,
-          content: serializer!(dataBlock, serOpts),
-          attributes: {
-            lang: name!,
-            rootIsArray,
-            blockIndex: index,
-          },
-        });
-        block.virtualContent = dataBlock;
-        return block;
-      });
-    }
   }
 
-  static fromFile(
+  static async fromContent(
+    content: string,
+    options: IContentGroup.CtorOptions = {},
+  ) {
+    const parsedOpts = merge(
+      {},
+      JsonYamlAdaptor.defaults,
+      this.defaults,
+      options,
+    );
+
+    const { contentBlockClass: ContentBlock } = parsedOpts;
+
+    const contentGroup = new this(parsedOpts);
+    const {
+      name,
+      methods: { deserializer = null, serializer = null } = {},
+      options: serOpts = {},
+    } =
+      JsonYamlAdaptor.resolveSerializer(
+        contentGroup.serializers!,
+        contentGroup.filepath ?? 'json',
+        parsedOpts,
+      ) || {};
+    contentGroup.serializers?.validateMethod(name!, 'deserializer');
+    contentGroup.serializers?.validateMethod(name!, 'serializer');
+    contentGroup.logger(
+      `Parsing content of file '${contentGroup.filepath}' with serializer '${name}'`,
+    );
+    const data = await deserializer!(content, serOpts);
+
+    // In case the top-level data is (not) an array, normalize to array and
+    // remember the state.
+    const rootIsArray = Array.isArray(data);
+    const dataArr = Array.isArray(data) ? data : data ? [data] : [];
+
+    contentGroup.blocks = await pMap(dataArr, async (dataBlock, index) => {
+      const block = new ContentBlock({
+        serializers: contentGroup.serializers,
+        filepath: contentGroup.filepath,
+        content: await serializer!(dataBlock, serOpts),
+        attributes: {
+          lang: name!,
+          rootIsArray,
+          blockIndex: index,
+        },
+      });
+      block.virtualContent = dataBlock;
+      return block;
+    });
+
+    return contentGroup;
+  }
+
+  static async fromFile(
     filepath: string,
     options: IContentGroup.CtorOptions &
-      Extract<Parameters<typeof fs.readFileSync>[1], object> = {},
+      Extract<Parameters<typeof fsp.readFile>[1], object> = {},
   ) {
     this.defaults.logger(`Reading file '${filepath}'`);
     const content = fs.existsSync(filepath)
-      ? (fs.readFileSync(filepath, {
+      ? ((await fsp.readFile(filepath, {
           encoding: 'utf-8',
           ...options,
-        }) as string)
+        })) as string)
       : '';
-    return new this({ ...options, filepath, content });
+    return this.fromContent(content, { ...options, filepath });
   }
 
   static get defaults() {
@@ -145,10 +158,10 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
   /**
    * Definitions data from i18n tags (<i18n>) from files.
    */
-  parser(
+  async parser(
     filepaths: string[],
     options: IAdaptorJY.ParserOptions = {},
-  ): JsonYamlDefinitionItem[] {
+  ): Promise<JsonYamlDefinitionItem[]> {
     const {
       contentGroupClass: ContentGroup,
       itemClass: Item,
@@ -158,17 +171,25 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
     const parsedOptions = merge({}, this.constructor.defaults, options);
     const { locale, pathFormatter } = parsedOptions;
 
-    const nestedFragments = filepaths.map((filepath) =>
-      ContentGroup.fromFile(filepath, parsedOptions).blocks.map((block) => {
+    const nestedFragments = await pMap(filepaths, async (filepath) => {
+      const contentGroup = await ContentGroup.fromFile(filepath, parsedOptions);
+
+      return pMap(contentGroup.blocks, async (block) => {
         this.logger(`Parsing file '${block.filepath}'`);
-        const currLocale = locale ?? pathFormatter.localeFromPath(filepath);
+
+        const currLocale =
+          locale ?? (await pathFormatter.localeFromPath(filepath));
+
         this.logger(`File locale: '${currLocale}'`);
+
         const contentByLocales = currLocale
           ? { [currLocale]: block.virtualContent }
           : block.virtualContent;
+
         this.logger(
           "Locales found: '" + Object.keys(contentByLocales).join("', '") + "'",
         );
+
         return Object.entries(contentByLocales).map(
           ([locale, value]: [string, any]) =>
             ItemArray.fromObject<
@@ -184,8 +205,8 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
               itemClass: Item as any,
             }).items,
         );
-      }),
-    );
+      });
+    });
     return flattenDeep(nestedFragments);
   }
 
@@ -194,23 +215,23 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
    */
   remover(filepaths: string[], options: IAdaptorJY.RemoverOptions = {}) {
     const { abortOnError } = merge({}, this.constructor.defaults, options);
-    safeWrite(options, ({ unlinkSync }) => {
-      for (const filepath of filepaths) {
+    return safeWrite(options, async ({ promises: { unlink } }) =>
+      pMap(filepaths, async (filepath) => {
         try {
           this.logger(`Removing file '${filepath}'`);
-          unlinkSync(filepath);
+          await unlink(filepath);
         } catch (e) {
           this.logger(`Failed to remove file '${filepath}'. Reason: '${e}'`);
           if (abortOnError) throw e;
         }
-      }
-    });
+      }),
+    );
   }
 
   /**
    * Writes content to files based on the DefinitionItems given.
    */
-  writer(
+  async writer(
     definitions: JsonYamlDefinitionItem[],
     options: IAdaptorJY.WriterOptions = {},
   ) {
@@ -237,99 +258,119 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
     // that harbours the translations specific to the locale from which the
     // definitions were copied.
     if (fileMatchLocale) {
-      definitions.forEach((item) => {
+      await pMap(definitions, async (item) => {
         if (
           item.sourceScope === 'locale' &&
           item.locale &&
-          pathFormatter.localeFromPath(item.source) !== item.locale
+          (await pathFormatter.localeFromPath(item.source)) !== item.locale
         ) {
-          item.source = pathFormatter.changeLocale(item.source, item.locale);
+          item.source = await pathFormatter.changeLocale(
+            item.source,
+            item.locale,
+          );
         }
       });
     }
 
     const definitionsByFilepaths = this._groupBySource(definitions);
 
-    safeWrite(options, (fileSys) => {
-      for (const [filepath, data] of Object.entries(definitionsByFilepaths)) {
-        const lang = path.extname(filepath).slice(1);
+    return safeWrite(options, async (fileSys) => {
+      await pMap(
+        Object.entries(definitionsByFilepaths),
+        async ([filepath, data]) => {
+          const lang = path.extname(filepath).slice(1);
 
-        const contentGroup = fs.existsSync(filepath)
-          ? ContentGroup.fromFile(filepath, options)
-          : new ContentGroup({
-              serializers: this.serializers,
-              filepath,
-            });
+          const contentGroup: IContentGroup.ContentGroup = fs.existsSync(
+            filepath,
+          )
+            ? await ContentGroup.fromFile(filepath, options)
+            : new ContentGroup({
+                serializers: this.serializers,
+                filepath,
+              });
 
-        const { matched, prepend, append } = contentGroup.resolveItems(
-          data,
-          options,
-        );
+          const { matched, prepend, append } = await contentGroup.resolveItems(
+            data,
+            options,
+          );
 
-        const rootIsArray =
-          contentGroup.length > 1
-            ? true
-            : contentGroup.length
-            ? contentGroup.blocks[0].attributes.rootIsArray
-            : data.find((item) => item.rootIsArray !== undefined)?.rootIsArray;
+          const rootIsArray =
+            contentGroup.length > 1
+              ? true
+              : contentGroup.length
+              ? contentGroup.blocks[0].attributes.rootIsArray
+              : data.find((item) => item.rootIsArray !== undefined)
+                  ?.rootIsArray;
 
-        // Go over the items that matched against existing blocks, and update
-        // their contents, or remove them if no item matched.
-        contentGroup.blocks.forEach((block) => {
-          const itemsToApply = matched.get(block);
-          // Skip if we have no items
-          if (!itemsToApply || !itemsToApply.length) {
-            // If we came across a block but there's no data to be written
-            // to it, remove the block.
-            contentGroup.remove(block);
-            return;
+          // Go over the items that matched against existing blocks, and update
+          // their contents, or remove them if no item matched.
+          await pMap(contentGroup.blocks, async (block) => {
+            const itemsToApply = matched.get(block);
+            // Skip if we have no items
+            if (!itemsToApply || !itemsToApply.length) {
+              // If we came across a block but there's no data to be written
+              // to it, remove the block.
+              await contentGroup.remove(block);
+              return;
+            }
+            const serializedContent = await block.serializeItems(
+              itemsToApply,
+              options,
+            );
+            block.content = await contentFormatter.formatContent(
+              serializedContent,
+            );
+            block.virtualContent = undefined;
+          });
+
+          // Prepend / append items
+          for (const itemMap of [prepend, append]) {
+            const position = itemMap === prepend ? 'prepend' : 'append';
+            for (const [itemLocale, items] of itemMap) {
+              const block = new ContentBlock({
+                attributes: {
+                  lang,
+                  rootIsArray,
+                  // '*' as locale means the items are not locale-scoped
+                  ...(itemLocale !== '*' ? { locale: itemLocale } : {}),
+                },
+                serializers: contentGroup.serializers,
+                filepath,
+              });
+              await contentGroup.insert(block, { position });
+              block.virtualContent = ItemArray.toObject(items, {
+                ...parsedOptions,
+                simple,
+              });
+            }
           }
-          const serializedContent = block.serializeItems(itemsToApply, options);
-          block.content = contentFormatter.formatContent(serializedContent);
-          block.virtualContent = undefined;
-        });
 
-        // Prepend / append items
-        for (const itemMap of [prepend, append]) {
-          const position = itemMap === prepend ? 'prepend' : 'append';
-          for (const [itemLocale, items] of itemMap) {
-            const block = new ContentBlock({
-              attributes: {
-                lang,
-                rootIsArray,
-                // '*' as locale means the items are not locale-scoped
-                ...(itemLocale !== '*' ? { locale: itemLocale } : {}),
-              },
-              serializers: contentGroup.serializers,
-              filepath,
-            });
-            contentGroup.insert(block, { position });
-            block.virtualContent = ItemArray.toObject(items, {
-              ...parsedOptions,
-              simple,
-            });
-          }
-        }
+          const contentData = await pMap(contentGroup.blocks, async (block) => {
+            const currLocale =
+              locale ??
+              (block.filepath
+                ? await pathFormatter.localeFromPath(block.filepath)
+                : undefined);
+            const vContent = await block.getVirtualContent();
+            return currLocale ? vContent[currLocale] : vContent;
+          });
 
-        const contentData = contentGroup.blocks.map((block) => {
-          const currLocale =
-            locale ??
-            (block.filepath
-              ? pathFormatter.localeFromPath(block.filepath)
-              : undefined);
-          const vContent = block.getVirtualContent();
-          return currLocale ? vContent[currLocale] : vContent;
-        });
-
-        const content = rootIsArray ? contentData : contentData[0];
-        const serContent = this._serialize(filepath, content, parsedOptions);
-        const formattedContent = contentFormatter.formatGroup(serContent || '');
-        // Overwrite the files with the updated content
-        this._write(filepath, formattedContent, {
-          fs: fileSys as FileSystem,
-          abortOnError,
-        });
-      }
+          const content = rootIsArray ? contentData : contentData[0];
+          const serContent = await this._serialize(
+            filepath,
+            content,
+            parsedOptions,
+          );
+          const formattedContent = await contentFormatter.formatGroup(
+            serContent || '',
+          );
+          // Overwrite the files with the updated content
+          return this._write(filepath, formattedContent, {
+            fs: fileSys as FileSystem,
+            abortOnError,
+          });
+        },
+      );
     });
   }
 
@@ -347,7 +388,7 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
     });
   }
 
-  _serialize(filepath: string, content: any, options: any) {
+  async _serialize(filepath: string, content: any, options: any) {
     const serializer = this.constructor.resolveSerializer(
       this.serializers,
       filepath,
@@ -355,25 +396,27 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
     );
     this.serializers.validateMethod(serializer.name, 'serializer');
     const serializerOpts = merge({}, serializer.options, options);
-    const serializedContent = serializer.methods.serializer!(
+    const serializedContent = await serializer.methods.serializer!(
       content,
       serializerOpts,
     );
     return serializedContent;
   }
 
-  _write(
+  async _write(
     filepath: string,
     content: string | Buffer,
     options: {
-      fs?: Pick<FileSystem, 'writeFileSync' | 'writeFile'>;
+      fs?: { promises: Pick<FileSystem['promises'], 'writeFile'> };
       abortOnError?: boolean;
     } = {},
   ) {
     const { fs: fileSys = fs, abortOnError } = options;
     try {
       this.logger(`Updating file '${filepath}'`);
-      fileSys.writeFileSync(filepath, content, { encoding: 'utf-8' });
+      await fileSys.promises.writeFile(filepath, content, {
+        encoding: 'utf-8',
+      });
     } catch (e) {
       this.logger(`Failed to update file '${filepath}'. Reason: '${e}'`);
       if (abortOnError) throw e;
@@ -404,8 +447,8 @@ export class JsonYamlAdaptor implements IAdaptorCollection.ItemMethods {
       json: true,
       abortOnError: true,
       fileMatchLocale: true,
-      contentFormatter: new ContentFormatter(),
-      pathFormatter: new PathFormatter(),
+      contentFormatter: new ContentFormatter() as IContentFormatter.ContentFormatter,
+      pathFormatter: new PathFormatter() as IPathFormatter.PathFormatter,
       serializers: new SerializerCollection({
         collection: {
           json: {

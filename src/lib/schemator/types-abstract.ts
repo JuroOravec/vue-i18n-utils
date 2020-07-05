@@ -15,8 +15,8 @@ export namespace AISchemator {
     scope?: 'locale' | 'master';
   }
 
-  export type SerializeOptions = AnyObj
-  export type DeserializeOptions = AnyObj
+  export type SerializeOptions = AnyObj;
+  export type DeserializeOptions = AnyObj;
 
   export interface CtorOptions
     extends GenerateOptions,
@@ -27,15 +27,22 @@ export namespace AISchemator {
 
   export abstract class Schemator {
     options = {} as AnyObj;
+
     logger = {} as (msg: string) => void;
-    generate(data: any, options?: GenerateOptions) {
-      return undefined as any;
-    }
-    serialize(schema: any, options?: SerializeOptions) {
-      return '' as string | Buffer;
-    }
-    deserialize(schema: string, options?: DeserializeOptions) {
-      return undefined as any;
-    }
+
+    generate = {} as (
+      data: any,
+      options?: GenerateOptions,
+    ) => any | Promise<any>;
+
+    serialize = {} as (
+      schema: any,
+      options?: SerializeOptions,
+    ) => string | Buffer | Promise<string | Buffer>;
+
+    deserialize = {} as (
+      schema: string,
+      options?: DeserializeOptions,
+    ) => any | Promise<any>;
   }
 }
